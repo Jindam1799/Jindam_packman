@@ -10,7 +10,6 @@
     <script src="data.js"></script>
 
     <style>
-      /* 터치 액션 제한으로 모바일 스와이프 시 새로고침/스크롤 튕김 완벽 방지 */
       body {
         background-color: #1a1a2e;
         color: white;
@@ -74,7 +73,6 @@
         max-width: 95vw;
         margin-top: 30px;
       }
-      /* 이미지가 선명하게 유지되도록 렌더링 옵션 추가 */
       canvas {
         background: #0f3460;
         display: block;
@@ -525,7 +523,7 @@
       }
 
       const canvas = document.getElementById('gameCanvas');
-      const ctx = canvas.getContext('2d', { alpha: false }); // 모바일 성능 최적화: 알파채널 비활성
+      const ctx = canvas.getContext('2d', { alpha: false });
       const TILE_SIZE = 30;
 
       let gameState = 'WAITING';
@@ -546,6 +544,7 @@
       let availableQuestions = [];
       let currentAIPattern = 'STANDARD';
       let aiEventTimer = null;
+      let lastTimerString = ''; // DOM 업데이트 제한을 위한 변수
 
       const initialMap = [
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -573,7 +572,6 @@
       canvas.width = COLS * TILE_SIZE;
       canvas.height = ROWS * TILE_SIZE;
 
-      // 🔥 모바일 프레임 드랍 1차 해결: 정적 배경 캐싱 (벽을 매 프레임 그리지 않음)
       const bgCache = document.createElement('canvas');
       bgCache.width = canvas.width;
       bgCache.height = canvas.height;
@@ -584,7 +582,6 @@
       penaltyCache.height = canvas.height;
       const penaltyCtx = penaltyCache.getContext('2d', { alpha: false });
 
-      // 🔥 모바일 프레임 드랍 2차 해결: 텍스트 이모지 렌더링 캐싱 (글씨를 매 프레임 쓰지 않음)
       const emoCache = {};
       function createEmojiCache(emoji) {
         const c = document.createElement('canvas');
@@ -819,9 +816,6 @@
             ctx.drawImage(emoCache['🐥'], -TILE_SIZE * 0.75, -TILE_SIZE * 0.75);
             ctx.globalAlpha = 1.0;
           } else {
-            if (isPenaltyMode) {
-              ctx.scale(1.2, 1.2);
-            } // 페널티 시 크기 팽창
             ctx.drawImage(
               emoCache[this.emoji],
               -TILE_SIZE * 0.75,
@@ -1234,7 +1228,7 @@
         showRankBoard();
       }
 
-      // 🔥 모바일 프레임 드랍 3차 해결: 먹이 그리기 최적화 (원 -> 네모 픽셀)
+      // 🔥 모바일 프레임 완벽 방어: 점(원)들을 한 번에 그리기 (Batch Rendering)
       function drawMap() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -1245,31 +1239,47 @@
           ctx.drawImage(bgCache, 0, 0);
         }
 
-        // 먹이만 그리기 (arc 대신 속도가 100배 빠른 fillRect 사용)
+        // 1. 하얀색 작은 점 펠릿 렌더링
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
         for (let y = 0; y < ROWS; y++) {
           for (let x = 0; x < COLS; x++) {
-            const tile = map[y][x];
-            const px = x * TILE_SIZE;
-            const py = y * TILE_SIZE;
-            if (tile === 2) {
-              ctx.fillStyle = '#fff';
+            if (map[y][x] === 2) {
+              const px = x * TILE_SIZE + TILE_SIZE / 2;
+              const py = y * TILE_SIZE + TILE_SIZE / 2;
+              ctx.moveTo(px + 2, py); // 선이 이어지지 않도록 이동
+              ctx.arc(px, py, 2, 0, Math.PI * 2);
+            }
+          }
+        }
+        ctx.fill();
+
+        // 2. 파워 펠릿 렌더링 (🔥다시 예쁜 빨간 원형으로 복구)
+        ctx.fillStyle = '#e94560';
+        ctx.beginPath();
+        for (let y = 0; y < ROWS; y++) {
+          for (let x = 0; x < COLS; x++) {
+            if (map[y][x] === 3) {
+              const px = x * TILE_SIZE + TILE_SIZE / 2;
+              const py = y * TILE_SIZE + TILE_SIZE / 2;
+              ctx.moveTo(px + 8, py);
+              ctx.arc(px, py, 8, 0, Math.PI * 2);
+            }
+          }
+        }
+        ctx.fill();
+
+        // 3. 유령 게이트
+        ctx.fillStyle = 'rgba(233, 69, 96, 0.3)';
+        for (let y = 0; y < ROWS; y++) {
+          for (let x = 0; x < COLS; x++) {
+            if (map[y][x] === 4) {
               ctx.fillRect(
-                px + TILE_SIZE / 2 - 3,
-                py + TILE_SIZE / 2 - 3,
-                6,
-                6,
+                x * TILE_SIZE,
+                y * TILE_SIZE + TILE_SIZE / 2 - 2,
+                TILE_SIZE,
+                4,
               );
-            } else if (tile === 3) {
-              ctx.fillStyle = '#e94560';
-              ctx.fillRect(
-                px + TILE_SIZE / 2 - 8,
-                py + TILE_SIZE / 2 - 8,
-                16,
-                16,
-              );
-            } else if (tile === 4) {
-              ctx.fillStyle = 'rgba(233, 69, 96, 0.3)';
-              ctx.fillRect(px, py + TILE_SIZE / 2 - 2, TILE_SIZE, 4);
             }
           }
         }
@@ -1282,8 +1292,13 @@
 
         if (gameState === 'PLAYING' && gameStarted) {
           accumulatedTime += deltaTime;
-          document.getElementById('timer-board').innerText =
-            'TIME: ' + accumulatedTime.toFixed(1) + 's';
+
+          // 🔥 DOM 최적화: 타이머 텍스트가 바뀔 때만 화면 갱신 (모바일 과부하 차단)
+          let newTimerString = 'TIME: ' + accumulatedTime.toFixed(1) + 's';
+          if (lastTimerString !== newTimerString) {
+            document.getElementById('timer-board').innerText = newTimerString;
+            lastTimerString = newTimerString;
+          }
 
           if (isPowerMode) {
             powerTimeLeft -= deltaTime;
@@ -1315,7 +1330,6 @@
         requestAnimationFrame(gameLoop);
       }
 
-      // 🔥 입력 통합 관리 (키보드, 스와이프, 버튼)
       function startGameOnInput() {
         if (!gameStarted) {
           gameStarted = true;
@@ -1359,25 +1373,25 @@
         }
       });
 
-      // 🔥 가상 조이스틱 (터치 딜레이 제로화)
-      function setupDpadButton(id, dirX, dirY) {
-        const btn = document.getElementById(id);
-        const move = (e) => {
-          e.preventDefault();
-          if (gameState !== 'PLAYING') return;
-          startGameOnInput();
-          player.nextDirX = dirX;
-          player.nextDirY = dirY;
-        };
-        btn.addEventListener('touchstart', move, { passive: false });
-        btn.addEventListener('mousedown', move);
-      }
-      setupDpadButton('btn-up', 0, -1);
-      setupDpadButton('btn-down', 0, 1);
-      setupDpadButton('btn-left', -1, 0);
-      setupDpadButton('btn-right', 1, 0);
+      window.handleVirtualPad = function (dir, e) {
+        e.preventDefault();
+        if (gameState !== 'PLAYING') return;
+        startGameOnInput();
+        if (dir === 'up') {
+          player.nextDirX = 0;
+          player.nextDirY = -1;
+        } else if (dir === 'down') {
+          player.nextDirX = 0;
+          player.nextDirY = 1;
+        } else if (dir === 'left') {
+          player.nextDirX = -1;
+          player.nextDirY = 0;
+        } else if (dir === 'right') {
+          player.nextDirX = 1;
+          player.nextDirY = 0;
+        }
+      };
 
-      // 🔥 제로 턴 스와이프 (touchmove 즉시 반응)
       let swipeStartX = null;
       let swipeStartY = null;
       const SWIPE_THRESHOLD = 20;
@@ -1426,7 +1440,6 @@
                 player.nextDirY = -1;
               }
             }
-            // 연속 방향 전환을 위해 기준점 리셋
             swipeStartX = touchX;
             swipeStartY = touchY;
           }

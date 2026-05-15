@@ -1,1479 +1,774 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>진담중국어 팡팡!</title>
     <script src="data.js"></script>
-
+    
     <style>
-      body {
-        background-color: #1a1a2e;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        margin: 0;
-        font-family: 'Malgun Gothic', sans-serif;
-        overflow: hidden;
-        touch-action: none;
-        overscroll-behavior: none;
-      }
-
-      @keyframes shake {
-        0% {
-          transform: translate(1px, 1px) rotate(0deg);
+        body { background-color: #1a1a2e; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; font-family: 'Malgun Gothic', sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; }
+        
+        @keyframes shake {
+            0% { transform: translate(1px, 1px); }
+            20% { transform: translate(-3px, 0px); }
+            40% { transform: translate(1px, -1px); }
+            60% { transform: translate(-3px, 1px); }
+            80% { transform: translate(-1px, -1px); }
+            100% { transform: translate(1px, -2px); }
         }
-        10% {
-          transform: translate(-1px, -2px) rotate(-1deg);
+        .shake-effect { animation: shake 0.3s; animation-iteration-count: 1; }
+
+        #game-area { position: relative; border: 4px solid #16213e; border-radius: 15px; box-shadow: 0 0 25px rgba(22, 33, 62, 0.7); max-width: 95vw; margin-top: 30px; background: #0f3460; }
+        
+        /* 🔥 GPU 하드웨어 가속 강제 활성화 및 픽셀 렌더링 최적화 */
+        canvas { display: block; border-radius: 10px; width: 100%; height: auto; image-rendering: -webkit-optimize-contrast; image-rendering: pixelated; touch-action: none; transform: translateZ(0); } 
+        
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 5; }
+        
+        #top-bar { position: absolute; top: -35px; left: 0; width: 100%; display: flex; justify-content: space-between; padding: 0 5px; box-sizing: border-box; }
+        .top-stat { font-size: clamp(14px, 4vw, 22px); font-weight: bold; text-shadow: 1px 1px 2px black; }
+        #mode-board { color: #FFD700; }
+        #score-board { color: #e94560; }
+        #timer-board { color: #00fff5; }
+
+        #power-gauge { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 70%; height: 14px; background: rgba(0,0,0,0.6); border: 2px solid #FFD700; border-radius: 10px; display: none; overflow: hidden; z-index: 10; box-shadow: 0 0 10px #FFD700; }
+        #power-fill { width: 100%; height: 100%; background: #FFD700; transition: width 0.1s linear; }
+        #power-text { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; color: #1a1a2e; text-shadow: none; letter-spacing: 1px; }
+
+        #status-msg { position: absolute; bottom: -30px; width: 100%; text-align: center; font-size: clamp(14px, 4vw, 20px); font-weight: bold; text-shadow: 1px 1px 2px black; color: #FFD700; transition: color 0.3s; }
+        
+        #brand-logo { position: absolute; bottom: 8px; right: 10px; font-size: clamp(10px, 3vw, 15px); font-weight: bold; color: rgba(255, 255, 255, 0.8); text-shadow: 0 0 8px #e94560, 0 0 15px #e94560; pointer-events: none; z-index: 10; }
+        .brand-highlight { color: #FFD700; text-shadow: 0 0 8px #FFD700; }
+
+        .modal { display: none; pointer-events: auto; background-color: rgba(15, 52, 96, 0.98); border: 4px solid; padding: 20px; text-align: center; border-radius: 15px; width: 90vw; max-width: 380px; box-sizing: border-box; color: white;}
+        
+        #main-menu-modal { display: block; border-color: #00fff5; }
+        .stage-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .stage-select-btn { padding: 10px; font-size: clamp(12px, 3.5vw, 15px); font-weight: bold; background: #16213e; color: #00fff5; border: 2px solid #00fff5; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        .main-game-btn { width: 100%; padding: 15px; font-size: clamp(16px, 5vw, 20px); font-weight: bold; background: #e94560; color: white; border: none; border-radius: 10px; cursor: pointer; margin-bottom: 10px; }
+
+        #quiz-modal { border-color: #e94560; }
+        #quiz-modal h2 { margin-top: 0; color: #fff; font-size: clamp(1rem, 4vw, 1.2rem); margin-bottom: 5px; }
+        #korean-text { color: #e94560; font-size: clamp(1.3rem, 5vw, 1.6rem); font-weight: bold; margin-bottom: 15px; text-shadow: 1px 1px 2px black;}
+        .option-btn { display: block; width: 100%; margin: 8px 0; padding: 10px; background-color: #16213e; color: white; border: 2px solid #0f3460; cursor: pointer; font-size: clamp(0.9rem, 3.5vw, 1.1rem); border-radius: 8px; transition: all 0.2s; }
+        
+        #game-end-msg { background-color: rgba(0,0,0,0.9); border-color: #FFD700; }
+        #game-end-msg .title { font-size: clamp(24px, 8vw, 40px); margin-bottom: 10px; font-weight: bold; }
+        #game-end-msg .stats { font-size: clamp(14px, 4vw, 20px); margin: 5px 0; color: #ccc; }
+        
+        #player-name { width: 80%; padding: 10px; margin: 15px 0; font-size: 16px; text-align: center; border-radius: 8px; border: 2px solid #00fff5; background: #16213e; color: white; outline: none;}
+        .btn-group { display: flex; gap: 10px; justify-content: center; margin-top: 15px;}
+        .btn-primary { padding: 10px 15px; font-size: clamp(14px, 4vw, 18px); cursor: pointer; background: #e94560; color: white; border: none; border-radius: 8px; font-weight: bold; flex: 2;}
+        .btn-secondary { padding: 10px 15px; font-size: clamp(12px, 3.5vw, 16px); cursor: pointer; background: #555; color: white; border: none; border-radius: 8px; font-weight: bold; flex: 1;}
+
+        #rank-board-modal { border-color: #00fff5; }
+        .rank-title { font-size: clamp(20px, 6vw, 32px); color: #00fff5; margin-top: 0; margin-bottom: 15px; }
+        .rank-list { list-style: none; padding: 0; margin: 0 0 15px 0; }
+        .rank-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #444; font-size: clamp(12px, 3.5vw, 16px);}
+        .rank-header { border-bottom: 2px solid #00fff5; font-weight: bold; color: #aaa;}
+        
+        #confirm-reset-modal { border-color: #e94560; }
+
+        #mobile-controls { display: none; flex-direction: column; align-items: center; margin-top: 40px; gap: 5px; width: 100%; touch-action: manipulation; }
+        .dpad-row { display: flex; gap: 15px; }
+        .dpad-btn { width: 60px; height: 60px; background: rgba(22, 33, 62, 0.8); border: 2px solid #00fff5; border-radius: 50%; color: white; font-size: 24px; display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none; touch-action: manipulation; cursor: pointer;}
+        .dpad-btn:active { background: #00fff5; color: #16213e; transform: scale(0.9); }
+        
+        /* 🔥 모바일 최적화: 버벅임의 주범인 그림자, 외곽선 효과를 끕니다 */
+        @media (max-width: 768px) { 
+            #mobile-controls { display: flex; } 
+            #game-area { box-shadow: none; border-width: 2px; }
         }
-        20% {
-          transform: translate(-3px, 0px) rotate(1deg);
-        }
-        30% {
-          transform: translate(3px, 2px) rotate(0deg);
-        }
-        40% {
-          transform: translate(1px, -1px) rotate(1deg);
-        }
-        50% {
-          transform: translate(-1px, 2px) rotate(-1deg);
-        }
-        60% {
-          transform: translate(-3px, 1px) rotate(0deg);
-        }
-        70% {
-          transform: translate(3px, 1px) rotate(-1deg);
-        }
-        80% {
-          transform: translate(-1px, -1px) rotate(1deg);
-        }
-        90% {
-          transform: translate(1px, 2px) rotate(0deg);
-        }
-        100% {
-          transform: translate(1px, -2px) rotate(-1deg);
-        }
-      }
-      .shake-effect {
-        animation: shake 0.5s;
-        animation-iteration-count: 1;
-      }
-
-      #game-area {
-        position: relative;
-        border: 4px solid #16213e;
-        border-radius: 15px;
-        box-shadow: 0 0 25px rgba(22, 33, 62, 0.7);
-        max-width: 95vw;
-        margin-top: 30px;
-      }
-      canvas {
-        background: #0f3460;
-        display: block;
-        border-radius: 10px;
-        width: 100%;
-        height: auto;
-        image-rendering: pixelated;
-      }
-      #ui-layer {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 5;
-      }
-
-      #top-bar {
-        position: absolute;
-        top: -35px;
-        left: 0;
-        width: 100%;
-        display: flex;
-        justify-content: space-between;
-        padding: 0 5px;
-        box-sizing: border-box;
-      }
-      .top-stat {
-        font-size: clamp(14px, 4vw, 22px);
-        font-weight: bold;
-        text-shadow: 1px 1px 2px black;
-      }
-      #mode-board {
-        color: #ffd700;
-      }
-      #score-board {
-        color: #e94560;
-      }
-      #timer-board {
-        color: #00fff5;
-      }
-
-      #power-gauge {
-        position: absolute;
-        top: -15px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 70%;
-        height: 14px;
-        background: rgba(0, 0, 0, 0.6);
-        border: 2px solid #ffd700;
-        border-radius: 10px;
-        display: none;
-        overflow: hidden;
-        z-index: 10;
-        box-shadow: 0 0 10px #ffd700;
-      }
-      #power-fill {
-        width: 100%;
-        height: 100%;
-        background: #ffd700;
-        transition: width 0.1s linear;
-      }
-      #power-text {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        font-weight: bold;
-        color: #1a1a2e;
-        text-shadow: none;
-        letter-spacing: 1px;
-      }
-
-      #status-msg {
-        position: absolute;
-        bottom: -30px;
-        width: 100%;
-        text-align: center;
-        font-size: clamp(14px, 4vw, 20px);
-        font-weight: bold;
-        text-shadow: 1px 1px 2px black;
-        color: #ffd700;
-        transition: color 0.3s;
-      }
-
-      #brand-logo {
-        position: absolute;
-        bottom: 8px;
-        right: 10px;
-        font-size: clamp(10px, 3vw, 15px);
-        font-weight: bold;
-        color: rgba(255, 255, 255, 0.8);
-        text-shadow:
-          0 0 8px #e94560,
-          0 0 15px #e94560;
-        pointer-events: none;
-        z-index: 10;
-      }
-      .brand-highlight {
-        color: #ffd700;
-        text-shadow: 0 0 8px #ffd700;
-      }
-
-      .modal {
-        display: none;
-        pointer-events: auto;
-        background-color: rgba(15, 52, 96, 0.98);
-        border: 4px solid;
-        padding: 20px;
-        text-align: center;
-        border-radius: 15px;
-        width: 90vw;
-        max-width: 380px;
-        box-sizing: border-box;
-        box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
-        color: white;
-      }
-
-      #main-menu-modal {
-        display: block;
-        border-color: #00fff5;
-      }
-      .stage-btn-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        margin-top: 15px;
-      }
-      .stage-select-btn {
-        padding: 10px;
-        font-size: clamp(12px, 3.5vw, 15px);
-        font-weight: bold;
-        background: #16213e;
-        color: #00fff5;
-        border: 2px solid #00fff5;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: 0.2s;
-      }
-      .main-game-btn {
-        width: 100%;
-        padding: 15px;
-        font-size: clamp(16px, 5vw, 20px);
-        font-weight: bold;
-        background: #e94560;
-        color: white;
-        border: none;
-        border-radius: 10px;
-        cursor: pointer;
-        margin-bottom: 10px;
-        box-shadow: 0 4px 10px rgba(233, 69, 96, 0.5);
-      }
-
-      #quiz-modal {
-        border-color: #e94560;
-      }
-      #quiz-modal h2 {
-        margin-top: 0;
-        color: #fff;
-        font-size: clamp(1rem, 4vw, 1.2rem);
-        margin-bottom: 5px;
-      }
-      #korean-text {
-        color: #e94560;
-        font-size: clamp(1.3rem, 5vw, 1.6rem);
-        font-weight: bold;
-        margin-bottom: 15px;
-        text-shadow: 1px 1px 2px black;
-      }
-      .option-btn {
-        display: block;
-        width: 100%;
-        margin: 8px 0;
-        padding: 10px;
-        background-color: #16213e;
-        color: white;
-        border: 2px solid #0f3460;
-        cursor: pointer;
-        font-size: clamp(0.9rem, 3.5vw, 1.1rem);
-        border-radius: 8px;
-        transition: all 0.2s;
-      }
-
-      #game-end-msg {
-        background-color: rgba(0, 0, 0, 0.9);
-        border-color: #ffd700;
-      }
-      #game-end-msg .title {
-        font-size: clamp(24px, 8vw, 40px);
-        margin-bottom: 10px;
-        font-weight: bold;
-      }
-      #game-end-msg .stats {
-        font-size: clamp(14px, 4vw, 20px);
-        margin: 5px 0;
-        color: #ccc;
-      }
-
-      #player-name {
-        width: 80%;
-        padding: 10px;
-        margin: 15px 0;
-        font-size: 16px;
-        text-align: center;
-        border-radius: 8px;
-        border: 2px solid #00fff5;
-        background: #16213e;
-        color: white;
-        outline: none;
-      }
-      .btn-group {
-        display: flex;
-        gap: 10px;
-        justify-content: center;
-        margin-top: 15px;
-      }
-      .btn-primary {
-        padding: 10px 15px;
-        font-size: clamp(14px, 4vw, 18px);
-        cursor: pointer;
-        background: #e94560;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-weight: bold;
-        flex: 2;
-      }
-      .btn-secondary {
-        padding: 10px 15px;
-        font-size: clamp(12px, 3.5vw, 16px);
-        cursor: pointer;
-        background: #555;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-weight: bold;
-        flex: 1;
-      }
-
-      #rank-board-modal {
-        border-color: #00fff5;
-      }
-      .rank-title {
-        font-size: clamp(20px, 6vw, 32px);
-        color: #00fff5;
-        margin-top: 0;
-        margin-bottom: 15px;
-      }
-      .rank-list {
-        list-style: none;
-        padding: 0;
-        margin: 0 0 15px 0;
-      }
-      .rank-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 8px;
-        border-bottom: 1px solid #444;
-        font-size: clamp(12px, 3.5vw, 16px);
-      }
-      .rank-header {
-        border-bottom: 2px solid #00fff5;
-        font-weight: bold;
-        color: #aaa;
-      }
-
-      #confirm-reset-modal {
-        border-color: #e94560;
-      }
-
-      /* 🔥 가상 조이스틱 버튼 클릭 반응성 상향 */
-      #mobile-controls {
-        display: none;
-        flex-direction: column;
-        align-items: center;
-        margin-top: 40px;
-        gap: 5px;
-        width: 100%;
-        touch-action: manipulation;
-      }
-      .dpad-row {
-        display: flex;
-        gap: 15px;
-      }
-      .dpad-btn {
-        width: 60px;
-        height: 60px;
-        background: rgba(22, 33, 62, 0.8);
-        border: 2px solid #00fff5;
-        border-radius: 50%;
-        color: white;
-        font-size: 24px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        user-select: none;
-        -webkit-user-select: none;
-        box-shadow: 0 4px 10px rgba(0, 255, 245, 0.3);
-        touch-action: manipulation;
-        cursor: pointer;
-      }
-      .dpad-btn:active {
-        background: #00fff5;
-        color: #16213e;
-        transform: scale(0.9);
-      }
-
-      @media (max-width: 768px) {
-        #mobile-controls {
-          display: flex;
-        }
-      }
     </style>
-  </head>
-  <body>
+</head>
+<body>
+
     <div id="game-area">
-      <div id="top-bar">
-        <div id="mode-board" class="top-stat">READY</div>
-        <div id="score-board" class="top-stat">SCORE: 0</div>
-        <div id="timer-board" class="top-stat">TIME: 0.0s</div>
-      </div>
-
-      <div id="power-gauge">
-        <div id="power-fill"></div>
-        <div id="power-text">🐥 병아리 타임! 🐥</div>
-      </div>
-
-      <canvas id="gameCanvas"></canvas>
-      <div id="status-msg">모드를 선택해주세요.</div>
-      <div id="brand-logo">
-        <span class="brand-highlight">진담중국어</span> 팩맨
-      </div>
-
-      <div id="ui-layer">
-        <div id="main-menu-modal" class="modal">
-          <h2 style="margin-top: 0">🎮 게임 모드 선택</h2>
-          <button class="main-game-btn" onclick="startRankedGame()">
-            🔥 본게임 시작<br /><span
-              style="font-size: 12px; font-weight: normal"
-              >(St.1~4 연속 플레이 / 랭킹 도전)</span
-            >
-          </button>
-          <div style="border-top: 2px dashed #444; margin: 15px 0"></div>
-          <p style="margin: 0; font-size: 14px; color: #aaa">
-            📖 연습 모드 (랭킹 미기록)
-          </p>
-          <div class="stage-btn-grid">
-            <button class="stage-select-btn" onclick="startPractice(1)">
-              St.1 기초 인사
-            </button>
-            <button class="stage-select-btn" onclick="startPractice(2)">
-              St.2 오다(来)
-            </button>
-            <button class="stage-select-btn" onclick="startPractice(3)">
-              St.3 듣다(听)
-            </button>
-            <button class="stage-select-btn" onclick="startPractice(4)">
-              St.4 보다(看)
-            </button>
-          </div>
+        <div id="top-bar">
+            <div id="mode-board" class="top-stat">READY</div>
+            <div id="score-board" class="top-stat">SCORE: 0</div>
+            <div id="timer-board" class="top-stat">TIME: 0.0s</div>
+        </div>
+        
+        <div id="power-gauge">
+            <div id="power-fill"></div>
+            <div id="power-text">🐥 병아리 타임! 🐥</div>
         </div>
 
-        <div id="quiz-modal" class="modal">
-          <h2>알맞은 중국어 문장은?</h2>
-          <div id="korean-text">한국어 뜻</div>
-          <div id="options-container"></div>
-        </div>
+        <canvas id="gameCanvas"></canvas>
+        <div id="status-msg">모드를 선택해주세요.</div>
+        <div id="brand-logo"><span class="brand-highlight">진담중국어</span> 팩맨</div>
+        
+        <div id="ui-layer">
+            <div id="main-menu-modal" class="modal">
+                <h2 style="margin-top:0;">🎮 게임 모드 선택</h2>
+                <button class="main-game-btn" onclick="startRankedGame()">🔥 본게임 시작<br><span style="font-size:12px; font-weight:normal;">(St.1~4 연속 플레이 / 랭킹 도전)</span></button>
+                <div style="border-top: 2px dashed #444; margin: 15px 0;"></div>
+                <p style="margin: 0; font-size:14px; color:#aaa;">📖 연습 모드 (랭킹 미기록)</p>
+                <div class="stage-btn-grid">
+                    <button class="stage-select-btn" onclick="startPractice(1)">St.1 기초 인사</button>
+                    <button class="stage-select-btn" onclick="startPractice(2)">St.2 오다(来)</button>
+                    <button class="stage-select-btn" onclick="startPractice(3)">St.3 듣다(听)</button>
+                    <button class="stage-select-btn" onclick="startPractice(4)">St.4 보다(看)</button>
+                </div>
+            </div>
 
-        <div id="game-end-msg" class="modal"></div>
+            <div id="quiz-modal" class="modal">
+                <h2>알맞은 중국어 문장은?</h2>
+                <div id="korean-text">한국어 뜻</div>
+                <div id="options-container"></div>
+            </div>
+            
+            <div id="game-end-msg" class="modal"></div>
 
-        <div id="rank-board-modal" class="modal">
-          <h2 class="rank-title">🏆 명예의 전당 🏆</h2>
-          <div class="rank-list rank-item rank-header">
-            <span style="width: 15%">순위</span>
-            <span style="width: 40%">이름</span>
-            <span style="width: 20%">점수</span>
-            <span style="width: 25%; text-align: right">시간</span>
-          </div>
-          <ul id="rank-list-ul" class="rank-list"></ul>
-          <div class="btn-group">
-            <button class="btn-primary" onclick="location.reload()">
-              메인 화면으로
-            </button>
-            <button class="btn-secondary" onclick="showResetConfirm()">
-              기록 초기화
-            </button>
-          </div>
+            <div id="rank-board-modal" class="modal">
+                <h2 class="rank-title">🏆 명예의 전당 🏆</h2>
+                <div class="rank-list rank-item rank-header">
+                    <span style="width: 15%;">순위</span>
+                    <span style="width: 40%;">이름</span>
+                    <span style="width: 20%;">점수</span>
+                    <span style="width: 25%; text-align: right;">시간</span>
+                </div>
+                <ul id="rank-list-ul" class="rank-list"></ul>
+                <div class="btn-group">
+                    <button class="btn-primary" onclick="location.reload()">메인 화면으로</button>
+                    <button class="btn-secondary" onclick="showResetConfirm()">기록 초기화</button>
+                </div>
+            </div>
+            
+            <div id="confirm-reset-modal" class="modal">
+                <h2 style="color: #e94560; margin-top: 0;">⚠️ 초기화 경고</h2>
+                <p style="font-size: 15px; margin-bottom: 20px;">정말 모든 랭킹 기록을 지우시겠습니까?<br><span style="font-size: 12px; color: #aaa;">(이 작업은 되돌릴 수 없습니다)</span></p>
+                <div class="btn-group">
+                    <button class="btn-primary" onclick="executeResetRank()">네, 지웁니다</button>
+                    <button class="btn-secondary" onclick="cancelResetRank()">아니오 (취소)</button>
+                </div>
+            </div>
         </div>
-
-        <div id="confirm-reset-modal" class="modal">
-          <h2 style="color: #e94560; margin-top: 0">⚠️ 초기화 경고</h2>
-          <p style="font-size: 15px; margin-bottom: 20px">
-            정말 모든 랭킹 기록을 지우시겠습니까?<br /><span
-              style="font-size: 12px; color: #aaa"
-              >(이 작업은 되돌릴 수 없습니다)</span
-            >
-          </p>
-          <div class="btn-group">
-            <button class="btn-primary" onclick="executeResetRank()">
-              네, 지웁니다
-            </button>
-            <button class="btn-secondary" onclick="cancelResetRank()">
-              아니오 (취소)
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
 
     <div id="mobile-controls">
-      <button class="dpad-btn" onpointerdown="handleVirtualPad('up', event)">
-        ▲
-      </button>
-      <div class="dpad-row">
-        <button
-          class="dpad-btn"
-          onpointerdown="handleVirtualPad('left', event)"
-        >
-          ◀
-        </button>
-        <button
-          class="dpad-btn"
-          onpointerdown="handleVirtualPad('down', event)"
-        >
-          ▼
-        </button>
-        <button
-          class="dpad-btn"
-          onpointerdown="handleVirtualPad('right', event)"
-        >
-          ▶
-        </button>
-      </div>
+        <button class="dpad-btn" onpointerdown="handleVirtualPad('up', event)">▲</button>
+        <div class="dpad-row">
+            <button class="dpad-btn" onpointerdown="handleVirtualPad('left', event)">◀</button>
+            <button class="dpad-btn" onpointerdown="handleVirtualPad('down', event)">▼</button>
+            <button class="dpad-btn" onpointerdown="handleVirtualPad('right', event)">▶</button>
+        </div>
     </div>
 
     <script>
-      const bgm = new Audio('bgm.mp3');
-      bgm.loop = true;
-      bgm.volume = 0.4;
-      const sfxEat = new Audio('eat.mp3');
-      sfxEat.volume = 0.2;
-      const sfxQuiz = new Audio('quiz.mp3');
-      const sfxCorrect = new Audio('correct.mp3');
-      const sfxWrong = new Audio('wrong.mp3');
-      const sfxCatch = new Audio('catch.mp3');
-      const sfxClear = new Audio('clear.mp3');
-      const sfxOver = new Audio('gameover.mp3');
+        const bgm = new Audio('bgm.mp3'); bgm.loop = true; bgm.volume = 0.4;
+        const sfxEat = new Audio('eat.mp3'); sfxEat.volume = 0.2;
+        const sfxQuiz = new Audio('quiz.mp3');
+        const sfxCorrect = new Audio('correct.mp3');
+        const sfxWrong = new Audio('wrong.mp3');
+        const sfxCatch = new Audio('catch.mp3');
+        const sfxClear = new Audio('clear.mp3');
+        const sfxOver = new Audio('gameover.mp3');
 
-      function playSound(audioObj) {
-        audioObj.currentTime = 0;
-        let playPromise = audioObj.play();
-        if (playPromise !== undefined) playPromise.catch((error) => {});
-      }
+        let isAudioUnlocked = false;
 
-      const canvas = document.getElementById('gameCanvas');
-      const ctx = canvas.getContext('2d', { alpha: false });
-      const TILE_SIZE = 30;
-
-      let gameState = 'WAITING';
-      let score = 0;
-      let stage = 1;
-      let gameStarted = false;
-      let isRankedMode = false;
-      let accumulatedTime = 0;
-      let lastTimestamp = 0;
-      let totalPellets = 0;
-
-      let isPowerMode = false;
-      let isPenaltyMode = false;
-      let penaltyTimer = null;
-      const POWER_DURATION = 8.0;
-      let powerTimeLeft = 0;
-
-      let availableQuestions = [];
-      let currentAIPattern = 'STANDARD';
-      let aiEventTimer = null;
-      let lastTimerString = '';
-
-      // 🔥 맵 디자인 수정: 유령의 집(정중앙) 빼고 펠릿(2)으로 꽉 채움
-      const initialMap = [
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 3, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 3, 1],
-        [1, 2, 1, 1, 2, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1],
-        [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
-        [1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1],
-        [1, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 1],
-        [1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1],
-        [0, 0, 0, 0, 2, 1, 2, 2, 0, 0, 0, 2, 2, 1, 2, 0, 0, 0, 0],
-        [1, 1, 1, 1, 2, 1, 2, 1, 1, 4, 1, 1, 2, 1, 2, 1, 1, 1, 1],
-        [1, 2, 2, 2, 2, 2, 2, 1, 0, 0, 0, 1, 2, 2, 2, 2, 2, 2, 1],
-        [1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1],
-        [1, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 2, 1],
-        [1, 1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1],
-        [1, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 1],
-        [1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1],
-        [1, 3, 2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2, 2, 2, 3, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-      ];
-
-      let map = [];
-      const ROWS = initialMap.length;
-      const COLS = initialMap[0].length;
-      canvas.width = COLS * TILE_SIZE;
-      canvas.height = ROWS * TILE_SIZE;
-
-      const bgCache = document.createElement('canvas');
-      bgCache.width = canvas.width;
-      bgCache.height = canvas.height;
-      const bgCtx = bgCache.getContext('2d', { alpha: false });
-
-      const penaltyCache = document.createElement('canvas');
-      penaltyCache.width = canvas.width;
-      penaltyCache.height = canvas.height;
-      const penaltyCtx = penaltyCache.getContext('2d', { alpha: false });
-
-      const emoCache = {};
-      function createEmojiCache(emoji) {
-        const c = document.createElement('canvas');
-        c.width = TILE_SIZE * 1.5;
-        c.height = TILE_SIZE * 1.5;
-        const cx = c.getContext('2d');
-        cx.font = `${TILE_SIZE * 0.9}px serif`;
-        cx.textAlign = 'center';
-        cx.textBaseline = 'middle';
-        cx.fillText(emoji, c.width / 2, c.height / 2);
-        return c;
-      }
-      ['💣', '👾', '🤖', '👹', '🐥'].forEach(
-        (e) => (emoCache[e] = createEmojiCache(e)),
-      );
-
-      function preDrawBackgrounds() {
-        bgCtx.fillStyle = '#0f3460';
-        bgCtx.fillRect(0, 0, bgCache.width, bgCache.height);
-        penaltyCtx.fillStyle = '#0f3460';
-        penaltyCtx.fillRect(0, 0, penaltyCache.width, penaltyCache.height);
-
-        for (let y = 0; y < ROWS; y++) {
-          for (let x = 0; x < COLS; x++) {
-            const tile = initialMap[y][x];
-            const px = x * TILE_SIZE;
-            const py = y * TILE_SIZE;
-            if (tile === 1) {
-              bgCtx.fillStyle = '#16213e';
-              bgCtx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-              bgCtx.strokeStyle = '#0f3460';
-              bgCtx.strokeRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-
-              penaltyCtx.fillStyle = '#3a0b16';
-              penaltyCtx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-              penaltyCtx.strokeStyle = '#e94560';
-              penaltyCtx.strokeRect(
-                px + 2,
-                py + 2,
-                TILE_SIZE - 4,
-                TILE_SIZE - 4,
-              );
+        // 🔥 첫 렉 제거: 가장 중요한 BGM 하나만 가볍게 로드
+        function unlockAudio() {
+            if(isAudioUnlocked) return;
+            const playPromise = bgm.play();
+            if(playPromise !== undefined) {
+                playPromise.then(() => { bgm.pause(); bgm.currentTime = 0; }).catch(() => {});
             }
-          }
-        }
-      }
-      preDrawBackgrounds();
-
-      function getPixelX(gridX) {
-        return gridX * TILE_SIZE + TILE_SIZE / 2;
-      }
-      function getPixelY(gridY) {
-        return gridY * TILE_SIZE + TILE_SIZE / 2;
-      }
-      function showStatusMessage(msg, color) {
-        const statusEl = document.getElementById('status-msg');
-        statusEl.innerText = msg;
-        statusEl.style.color = color;
-      }
-
-      function triggerRandomAIEvent() {
-        if (gameState !== 'PLAYING') return;
-        if (isPowerMode || isPenaltyMode) {
-          aiEventTimer = setTimeout(triggerRandomAIEvent, 3000);
-          return;
+            isAudioUnlocked = true;
         }
 
-        const patterns = ['STANDARD', 'STANDARD', 'RUSH', 'AMBUSH', 'SCATTER'];
-        currentAIPattern =
-          patterns[Math.floor(Math.random() * patterns.length)];
+        function playSound(audioObj) {
+            audioObj.currentTime = 0;
+            let playPromise = audioObj.play();
+            if (playPromise !== undefined) playPromise.catch(error => {});
+        }
 
-        if (currentAIPattern === 'RUSH')
-          showStatusMessage(
-            '🚨 적들의 합동 돌진! 거리를 좁혀옵니다!',
-            '#ff5e7e',
-          );
-        else if (currentAIPattern === 'AMBUSH')
-          showStatusMessage('⚠️ 적들이 포위망을 형성합니다!', '#FFD700');
-        else if (currentAIPattern === 'SCATTER')
-          showStatusMessage('💨 적들이 잠시 흩어집니다!', '#00fff5');
-        else showStatusMessage('게임을 계속 진행하세요.', 'white');
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true }); // 하드웨어 렌더링 최적화
+        const TILE_SIZE = 30; 
 
-        const nextEventTime = Math.random() * 3000 + 5000;
-        clearTimeout(aiEventTimer);
-        aiEventTimer = setTimeout(triggerRandomAIEvent, nextEventTime);
-      }
+        let gameState = 'WAITING'; 
+        let score = 0; let stage = 1; let gameStarted = false; let isRankedMode = false;
+        let accumulatedTime = 0; let lastTimestamp = 0; let totalPellets = 0; 
+        
+        let isPowerMode = false; let isPenaltyMode = false; 
+        let penaltyTimer = null;
+        const POWER_DURATION = 8.0; let powerTimeLeft = 0; 
 
-      class Pacman {
-        constructor() {
-          this.speed = 3.5;
-          this.radius = TILE_SIZE * 0.4;
-          this.mouthSpeed = 0.2;
-          this.reset(9, 15);
-        }
-        reset(startX, startY) {
-          this.gridX = startX;
-          this.gridY = startY;
-          this.px = getPixelX(startX);
-          this.py = getPixelY(startY);
-          this.dirX = 0;
-          this.dirY = 0;
-          this.nextDirX = 0;
-          this.nextDirY = 0;
-          this.mouthOpen = 0;
-          this.angle = 0;
-        }
-        draw() {
-          if (this.dirX !== 0 || this.dirY !== 0) {
-            this.mouthOpen += this.mouthSpeed;
-            if (this.mouthOpen > 0.2 * Math.PI || this.mouthOpen <= 0)
-              this.mouthSpeed = -this.mouthSpeed;
-          } else {
-            this.mouthOpen = 0.1 * Math.PI;
-          }
+        let availableQuestions = [];
+        let currentAIPattern = 'STANDARD'; let aiEventTimer = null;
+        let lastTimerString = ""; 
+        let activePellets = []; 
 
-          ctx.save();
-          ctx.translate(this.px, this.py);
-          ctx.rotate(this.angle);
-          ctx.beginPath();
-          if (isPowerMode) ctx.fillStyle = '#FFD700';
-          else if (isPenaltyMode) ctx.fillStyle = '#ffb8ae';
-          else ctx.fillStyle = '#00fff5';
-          ctx.arc(
-            0,
-            0,
-            this.radius,
-            this.mouthOpen,
-            2 * Math.PI - this.mouthOpen,
-          );
-          ctx.lineTo(0, 0);
-          ctx.fill();
-          ctx.closePath();
-          ctx.restore();
-        }
-        update() {
-          if (gameState !== 'PLAYING' || !gameStarted) return;
-          const centerX = getPixelX(this.gridX);
-          const centerY = getPixelY(this.gridY);
-          if (
-            Math.abs(this.px - centerX) <= this.speed &&
-            Math.abs(this.py - centerY) <= this.speed
-          ) {
-            this.px = centerX;
-            this.py = centerY;
-            if (this.nextDirX !== 0 || this.nextDirY !== 0) {
-              let nextX = (this.gridX + this.nextDirX + COLS) % COLS;
-              let nextY = this.gridY + this.nextDirY;
-              if (
-                map[nextY] &&
-                map[nextY][nextX] !== 1 &&
-                map[nextY][nextX] !== 4
-              ) {
-                this.dirX = this.nextDirX;
-                this.dirY = this.nextDirY;
-                if (this.dirX === 1) this.angle = 0;
-                else if (this.dirX === -1) this.angle = Math.PI;
-                else if (this.dirY === 1) this.angle = Math.PI / 2;
-                else if (this.dirY === -1) this.angle = -Math.PI / 2;
-              }
-            }
-            let frontX = (this.gridX + this.dirX + COLS) % COLS;
-            let frontY = this.gridY + this.dirY;
-            if (
-              map[frontY] &&
-              (map[frontY][frontX] === 1 || map[frontY][frontX] === 4)
-            ) {
-              this.dirX = 0;
-              this.dirY = 0;
-            } else {
-              this.gridX = frontX;
-              this.gridY = frontY;
-            }
-          }
-          this.px += this.dirX * this.speed;
-          this.py += this.dirY * this.speed;
-          if (this.px < 0) {
-            this.px += canvas.width;
-            this.gridX = COLS - 1;
-          } else if (this.px >= canvas.width) {
-            this.px -= canvas.width;
-            this.gridX = 0;
-          }
+        const initialMap = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,3,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,3,1],
+            [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
+            [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+            [1,2,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,2,1],
+            [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1],
+            [1,1,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,1,1], 
+            [0,0,0,0,2,1,2,2,0,0,0,2,2,1,2,0,0,0,0], 
+            [1,1,1,1,2,1,2,1,1,4,1,1,2,1,2,1,1,1,1], 
+            [1,2,2,2,2,2,2,1,0,0,0,1,2,2,2,2,2,2,1],
+            [1,2,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,2,1], 
+            [1,2,2,1,2,2,2,2,2,1,2,2,2,2,2,1,2,2,1], 
+            [1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1], 
+            [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1], 
+            [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1], 
+            [1,3,2,2,2,2,2,2,2,0,2,2,2,2,2,2,2,3,1], 
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ];
 
-          if (map[this.gridY] && map[this.gridY][this.gridX]) {
-            const tile = map[this.gridY][this.gridX];
-            if (tile === 2) {
-              map[this.gridY][this.gridX] = 0;
-              score += 10;
-              totalPellets--;
-              playSound(sfxEat);
-              updateScore();
-              checkWin();
-            } else if (tile === 3) {
-              map[this.gridY][this.gridX] = 0;
-              totalPellets--;
-              bgm.pause();
-              playSound(sfxQuiz);
-              updateScore();
-              triggerQuiz();
-            }
-          }
-        }
-      }
+        let map = [];
+        const ROWS = initialMap.length; const COLS = initialMap[0].length;
+        canvas.width = COLS * TILE_SIZE; canvas.height = ROWS * TILE_SIZE;
 
-      class Ghost {
-        constructor(emoji, id, initialBaseSpeed) {
-          this.emoji = emoji;
-          this.id = id;
-          this.initialBaseSpeed = initialBaseSpeed;
-          this.baseSpeed = initialBaseSpeed;
-          this.speed = this.baseSpeed;
-        }
-        reset(startX, startY) {
-          this.startX = startX;
-          this.startY = startY;
-          this.gridX = startX;
-          this.gridY = startY;
-          this.px = getPixelX(startX);
-          this.py = getPixelY(startY);
-          this.dirX = 1;
-          this.dirY = 0;
-          const stageMultiplier = isRankedMode ? stage - 1 : 0;
-          this.baseSpeed = this.initialBaseSpeed + stageMultiplier * 0.3;
-          this.speed = this.baseSpeed;
-        }
-        draw() {
-          ctx.save();
-          ctx.translate(this.px, this.py);
-          if (isPowerMode) {
-            if (powerTimeLeft <= 2.5 && Math.floor(powerTimeLeft * 5) % 2 === 0)
-              ctx.globalAlpha = 0.3;
-            ctx.drawImage(emoCache['🐥'], -TILE_SIZE * 0.75, -TILE_SIZE * 0.75);
-            ctx.globalAlpha = 1.0;
-          } else {
-            ctx.drawImage(
-              emoCache[this.emoji],
-              -TILE_SIZE * 0.75,
-              -TILE_SIZE * 0.75,
-            );
-          }
-          ctx.restore();
-        }
-        getTarget() {
-          if (this.gridY === 9 && this.gridX >= 8 && this.gridX <= 10)
-            return { x: 9, y: 7 };
-          if (isPowerMode || isPenaltyMode || this.id === 0)
-            return { x: player.gridX, y: player.gridY };
+        const bgCache = document.createElement('canvas');
+        bgCache.width = canvas.width; bgCache.height = canvas.height;
+        const bgCtx = bgCache.getContext('2d', { alpha: false });
 
-          if (currentAIPattern === 'RUSH') {
-            return { x: player.gridX, y: player.gridY };
-          } else if (currentAIPattern === 'AMBUSH') {
-            if (this.id === 0) return { x: player.gridX, y: player.gridY - 3 };
-            if (this.id === 1) return { x: player.gridX, y: player.gridY + 3 };
-            if (this.id === 2) return { x: player.gridX - 3, y: player.gridY };
-            if (this.id === 3) return { x: player.gridX + 3, y: player.gridY };
-          } else if (currentAIPattern === 'SCATTER') {
-            if (this.id === 0) return { x: 1, y: 1 };
-            if (this.id === 1) return { x: COLS - 2, y: 1 };
-            if (this.id === 2) return { x: 1, y: ROWS - 2 };
-            if (this.id === 3) return { x: COLS - 2, y: ROWS - 2 };
-          }
-          if (this.id === 1)
-            return {
-              x: player.gridX + player.dirX * 3,
-              y: player.gridY + player.dirY * 3,
-            };
-          if (this.id === 2)
-            return {
-              x: player.gridX - player.dirX * 2,
-              y: player.gridY - player.dirY * 2,
-            };
-          if (this.id === 3) {
-            const dist =
-              Math.abs(this.gridX - player.gridX) +
-              Math.abs(this.gridY - player.gridY);
-            if (dist < 6) return { x: 1, y: 1 };
-            return { x: player.gridX, y: player.gridY };
-          }
-          return { x: player.gridX, y: player.gridY };
+        const penaltyCache = document.createElement('canvas');
+        penaltyCache.width = canvas.width; penaltyCache.height = canvas.height;
+        const penaltyCtx = penaltyCache.getContext('2d', { alpha: false });
+
+        const emoCache = {};
+        function createEmojiCache(emoji) {
+            const c = document.createElement('canvas');
+            c.width = 40; c.height = 40;
+            const cx = c.getContext('2d');
+            cx.font = `26px serif`;
+            cx.textAlign = "center"; cx.textBaseline = "middle";
+            cx.fillText(emoji, 20, 20);
+            return c;
         }
-        update() {
-          if (gameState !== 'PLAYING' || !gameStarted) return;
-          const centerX = getPixelX(this.gridX);
-          const centerY = getPixelY(this.gridY);
-          if (
-            Math.abs(this.px - centerX) <= this.speed &&
-            Math.abs(this.py - centerY) <= this.speed
-          ) {
-            this.px = centerX;
-            this.py = centerY;
-            const dirs = [
-              [1, 0],
-              [-1, 0],
-              [0, 1],
-              [0, -1],
-            ];
-            let validDirs = [];
-            for (let d of dirs) {
-              const nextX = (this.gridX + d[0] + COLS) % COLS;
-              const nextY = this.gridY + d[1];
-              if (
-                nextY >= 0 &&
-                nextY < ROWS &&
-                map[nextY][nextX] !== 1 &&
-                !(d[0] === -this.dirX && d[1] === -this.dirY)
-              ) {
-                validDirs.push(d);
-              }
-            }
-            if (validDirs.length > 0) {
-              const getDirScore = (dir) => {
-                const nx = (this.gridX + dir[0] + COLS) % COLS;
-                const ny = this.gridY + dir[1];
-                const target = this.getTarget();
-                let distScore =
-                  Math.abs(nx - target.x) + Math.abs(ny - target.y);
-                if (isPowerMode) distScore = -distScore;
-                let ghostAvoidancePenalty = 0;
-                if (currentAIPattern !== 'RUSH') {
-                  ghosts.forEach((g) => {
-                    if (g.id !== this.id) {
-                      if (Math.abs(nx - g.gridX) + Math.abs(ny - g.gridY) === 0)
-                        ghostAvoidancePenalty += 15;
+        ['💣','👾','🤖','👹','🐥'].forEach(e => emoCache[e] = createEmojiCache(e));
+
+        function preDrawBackgrounds() {
+            bgCtx.fillStyle = "#0f3460"; bgCtx.fillRect(0, 0, bgCache.width, bgCache.height);
+            penaltyCtx.fillStyle = "#0f3460"; penaltyCtx.fillRect(0, 0, penaltyCache.width, penaltyCache.height);
+
+            for (let y = 0; y < ROWS; y++) {
+                for (let x = 0; x < COLS; x++) {
+                    const tile = initialMap[y][x]; 
+                    const px = x * TILE_SIZE; const py = y * TILE_SIZE;
+                    if (tile === 1) { 
+                        bgCtx.fillStyle = "#16213e"; bgCtx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                        bgCtx.strokeStyle = "#0f3460"; bgCtx.strokeRect(px+2, py+2, TILE_SIZE-4, TILE_SIZE-4);
+                        
+                        penaltyCtx.fillStyle = "#3a0b16"; penaltyCtx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                        penaltyCtx.strokeStyle = "#e94560"; penaltyCtx.strokeRect(px+2, py+2, TILE_SIZE-4, TILE_SIZE-4);
+                    } else if (tile === 4) { 
+                        bgCtx.fillStyle = "rgba(233, 69, 96, 0.3)"; bgCtx.fillRect(px, py + TILE_SIZE/2 - 2, TILE_SIZE, 4);
+                        penaltyCtx.fillStyle = "rgba(233, 69, 96, 0.3)"; penaltyCtx.fillRect(px, py + TILE_SIZE/2 - 2, TILE_SIZE, 4);
                     }
-                  });
                 }
-                return distScore + ghostAvoidancePenalty;
-              };
-              validDirs.sort((a, b) => getDirScore(a) - getDirScore(b));
-              let chosenDir = validDirs[0];
-              if (
-                !isPowerMode &&
-                !isPenaltyMode &&
-                Math.random() < 0.1 &&
-                validDirs.length > 1
-              ) {
-                chosenDir =
-                  validDirs[Math.floor(Math.random() * validDirs.length)];
-              }
-              this.dirX = chosenDir[0];
-              this.dirY = chosenDir[1];
-            } else {
-              this.dirX *= -1;
-              this.dirY *= -1;
             }
-            this.gridX = (this.gridX + this.dirX + COLS) % COLS;
-            this.gridY += this.dirY;
-          }
-          this.px += this.dirX * this.speed;
-          this.py += this.dirY * this.speed;
-          if (this.px < 0) {
-            this.px += canvas.width;
-            this.gridX = COLS - 1;
-          } else if (this.px >= canvas.width) {
-            this.px -= canvas.width;
-            this.gridX = 0;
-          }
         }
-      }
+        preDrawBackgrounds();
 
-      const player = new Pacman();
-      const ghosts = [
-        new Ghost('💣', 0, 2.6),
-        new Ghost('👾', 1, 2.4),
-        new Ghost('🤖', 2, 2.5),
-        new Ghost('👹', 3, 2.3),
-      ];
-
-      function startRankedGame() {
-        isRankedMode = true;
-        stage = 1;
-        document.getElementById('main-menu-modal').style.display = 'none';
-        document.getElementById('mode-board').innerText = '🔥 본게임';
-        document.getElementById('mode-board').style.color = '#e94560';
-        score = 0;
-        accumulatedTime = 0;
-        updateScore();
-        initStage();
-      }
-
-      function startPractice(num) {
-        isRankedMode = false;
-        stage = num;
-        document.getElementById('main-menu-modal').style.display = 'none';
-        document.getElementById('mode-board').innerText = `연습: St.${stage}`;
-        document.getElementById('mode-board').style.color = '#00fff5';
-        score = 0;
-        accumulatedTime = 0;
-        updateScore();
-        initStage();
-      }
-
-      function initStage() {
-        map = initialMap.map((row) => [...row]);
-        totalPellets = 0;
-        for (let y = 0; y < ROWS; y++) {
-          for (let x = 0; x < COLS; x++) {
-            if (map[y][x] === 2 || map[y][x] === 3) totalPellets++;
-          }
+        function getPixelX(gridX) { return gridX * TILE_SIZE + TILE_SIZE / 2; }
+        function getPixelY(gridY) { return gridY * TILE_SIZE + TILE_SIZE / 2; }
+        function showStatusMessage(msg, color) {
+            const statusEl = document.getElementById('status-msg');
+            statusEl.textContent = msg; statusEl.style.color = color;
         }
 
-        player.reset(9, 15);
-        ghosts[0].reset(9, 7);
-        ghosts[1].reset(8, 9);
-        ghosts[2].reset(9, 9);
-        ghosts[3].reset(10, 9);
+        function triggerRandomAIEvent() {
+            if (gameState !== 'PLAYING') return;
+            if (isPowerMode || isPenaltyMode) { aiEventTimer = setTimeout(triggerRandomAIEvent, 3000); return; }
 
-        isPowerMode = false;
-        isPenaltyMode = false;
-        document.getElementById('power-gauge').style.display = 'none';
-        clearTimeout(penaltyTimer);
+            const patterns = ['STANDARD', 'STANDARD', 'RUSH', 'AMBUSH', 'SCATTER'];
+            currentAIPattern = patterns[Math.floor(Math.random() * patterns.length)];
 
-        currentAIPattern = 'STANDARD';
-        clearTimeout(aiEventTimer);
-        gameState = 'PLAYING';
-        gameStarted = false;
+            if (currentAIPattern === 'RUSH') showStatusMessage("🚨 적들의 합동 돌진! 거리를 좁혀옵니다!", "#ff5e7e");
+            else if (currentAIPattern === 'AMBUSH') showStatusMessage("⚠️ 적들이 포위망을 형성합니다!", "#FFD700");
+            else if (currentAIPattern === 'SCATTER') showStatusMessage("💨 적들이 잠시 흩어집니다!", "#00fff5");
+            else showStatusMessage("게임을 계속 진행하세요.", "white");
 
-        if (typeof quizStages !== 'undefined') {
-          let stageIndex =
-            stage - 1 < quizStages.length ? stage - 1 : quizStages.length - 1;
-          availableQuestions = [...quizStages[stageIndex]];
-        } else {
-          availableQuestions = [];
+            const nextEventTime = Math.random() * 3000 + 5000;
+            clearTimeout(aiEventTimer);
+            aiEventTimer = setTimeout(triggerRandomAIEvent, nextEventTime);
         }
 
-        showStatusMessage(`방향키나 터치로 출발하세요!`, 'white');
-      }
-
-      function checkCollisions() {
-        if (!gameStarted) return;
-        for (let ghost of ghosts) {
-          if (
-            Math.sqrt(
-              Math.pow(player.px - ghost.px, 2) +
-                Math.pow(player.py - ghost.py, 2),
-            ) <
-            TILE_SIZE * 0.7
-          ) {
-            if (isPowerMode) {
-              ghost.reset(9, 9);
-              score += 200;
-              playSound(sfxCatch);
-              updateScore();
-            } else {
-              clearTimeout(aiEventTimer);
-              if (isRankedMode) showGameEndUI(false);
-              else showPracticeEndUI(false);
-              return;
+        class Pacman {
+            constructor() { this.speed = 3.5; this.radius = TILE_SIZE * 0.4; this.mouthSpeed = 0.2; this.reset(9, 15); }
+            reset(startX, startY) {
+                this.gridX = startX; this.gridY = startY; this.px = getPixelX(startX); this.py = getPixelY(startY);
+                this.dirX = 0; this.dirY = 0; this.nextDirX = 0; this.nextDirY = 0; this.mouthOpen = 0; this.angle = 0; 
             }
-          }
+            draw() {
+                if (this.dirX !== 0 || this.dirY !== 0) {
+                    this.mouthOpen += this.mouthSpeed;
+                    if (this.mouthOpen > 0.2 * Math.PI || this.mouthOpen <= 0) this.mouthSpeed = -this.mouthSpeed;
+                } else { this.mouthOpen = 0.1 * Math.PI; }
+                
+                ctx.save(); 
+                // 🔥 비트 연산자(| 0)로 소수점을 제거하여 강제 정수 렌더링 (서브픽셀 렉 제거)
+                ctx.translate(this.px | 0, this.py | 0); 
+                ctx.rotate(this.angle); ctx.beginPath();
+                if (isPowerMode) ctx.fillStyle = "#FFD700"; else if (isPenaltyMode) ctx.fillStyle = "#ffb8ae"; else ctx.fillStyle = "#00fff5";
+                ctx.arc(0, 0, this.radius, this.mouthOpen, 2 * Math.PI - this.mouthOpen);
+                ctx.lineTo(0, 0); ctx.fill(); ctx.closePath(); ctx.restore();
+            }
+            update() {
+                if (gameState !== 'PLAYING' || !gameStarted) return;
+                const centerX = getPixelX(this.gridX); const centerY = getPixelY(this.gridY);
+                if (Math.abs(this.px - centerX) <= this.speed && Math.abs(this.py - centerY) <= this.speed) {
+                    this.px = centerX; this.py = centerY; 
+                    if (this.nextDirX !== 0 || this.nextDirY !== 0) {
+                        let nextX = (this.gridX + this.nextDirX + COLS) % COLS; let nextY = this.gridY + this.nextDirY;
+                        if (map[nextY] && map[nextY][nextX] !== 1 && map[nextY][nextX] !== 4) {
+                            this.dirX = this.nextDirX; this.dirY = this.nextDirY;
+                            if(this.dirX === 1) this.angle = 0; else if(this.dirX === -1) this.angle = Math.PI;
+                            else if(this.dirY === 1) this.angle = Math.PI/2; else if(this.dirY === -1) this.angle = -Math.PI/2;
+                        }
+                    }
+                    let frontX = (this.gridX + this.dirX + COLS) % COLS; let frontY = this.gridY + this.dirY;
+                    if (map[frontY] && (map[frontY][frontX] === 1 || map[frontY][frontX] === 4)) { this.dirX = 0; this.dirY = 0; 
+                    } else { this.gridX = frontX; this.gridY = frontY; }
+                }
+                this.px += this.dirX * this.speed; this.py += this.dirY * this.speed;
+                if (this.px < 0) { this.px += canvas.width; this.gridX = COLS - 1; } else if (this.px >= canvas.width) { this.px -= canvas.width; this.gridX = 0; }
+                
+                if(map[this.gridY] && map[this.gridY][this.gridX]) {
+                    const tile = map[this.gridY][this.gridX];
+                    if (tile === 2 || tile === 3) { 
+                        map[this.gridY][this.gridX] = 0; 
+                        totalPellets--; 
+                        
+                        let idx = activePellets.findIndex(p => p.x === this.gridX && p.y === this.gridY);
+                        if(idx !== -1) activePellets.splice(idx, 1);
+                        
+                        if (tile === 2) {
+                            score += 10; playSound(sfxEat); updateScore(); checkWin();
+                        } else {
+                            bgm.pause(); playSound(sfxQuiz); updateScore(); triggerQuiz(); 
+                        }
+                    } 
+                }
+            }
         }
-      }
 
-      function triggerQuiz() {
-        gameState = 'QUIZ';
-        const modal = document.getElementById('quiz-modal');
-        const kText = document.getElementById('korean-text');
-        const optionsContainer = document.getElementById('options-container');
-        if (availableQuestions.length === 0) {
-          let stageIndex =
-            stage - 1 < quizStages.length ? stage - 1 : quizStages.length - 1;
-          availableQuestions = [...quizStages[stageIndex]];
+        const GHOST_DIRS = [[1,0], [-1,0], [0,1], [0,-1]];
+        
+        class Ghost {
+            constructor(emoji, id, initialBaseSpeed) { this.emoji = emoji; this.id = id; this.initialBaseSpeed = initialBaseSpeed; this.baseSpeed = initialBaseSpeed; this.speed = this.baseSpeed; }
+            reset(startX, startY) {
+                this.startX = startX; this.startY = startY; this.gridX = startX; this.gridY = startY; this.px = getPixelX(startX); this.py = getPixelY(startY); this.dirX = 1; this.dirY = 0;
+                const stageMultiplier = isRankedMode ? (stage - 1) : 0;
+                this.baseSpeed = this.initialBaseSpeed + (stageMultiplier * 0.3); 
+                this.speed = this.baseSpeed;
+            }
+            draw() {
+                ctx.save(); 
+                // 🔥 비트 연산자(| 0)로 소수점 제거 (서브픽셀 렉 완전 방어)
+                ctx.translate(this.px | 0, this.py | 0);
+                if (isPowerMode) { 
+                    if (powerTimeLeft <= 2.5 && Math.floor(powerTimeLeft * 5) % 2 === 0) ctx.globalAlpha = 0.3;
+                    ctx.drawImage(emoCache['🐥'], -20, -20);
+                    ctx.globalAlpha = 1.0; 
+                } else { 
+                    ctx.drawImage(emoCache[this.emoji], -20, -20); 
+                }
+                ctx.restore();
+            }
+            getTarget() {
+                if (this.gridY === 9 && this.gridX >= 8 && this.gridX <= 10) return { x: 9, y: 7 }; 
+                if (isPowerMode || isPenaltyMode || this.id === 0) return { x: player.gridX, y: player.gridY }; 
+
+                if (currentAIPattern === 'RUSH') { return { x: player.gridX, y: player.gridY };
+                } else if (currentAIPattern === 'AMBUSH') {
+                    if (this.id === 0) return { x: player.gridX, y: player.gridY - 3 };
+                    if (this.id === 1) return { x: player.gridX, y: player.gridY + 3 };
+                    if (this.id === 2) return { x: player.gridX - 3, y: player.gridY };
+                    if (this.id === 3) return { x: player.gridX + 3, y: player.gridY };
+                } else if (currentAIPattern === 'SCATTER') {
+                    if (this.id === 0) return { x: 1, y: 1 };
+                    if (this.id === 1) return { x: COLS-2, y: 1 };
+                    if (this.id === 2) return { x: 1, y: ROWS-2 };
+                    if (this.id === 3) return { x: COLS-2, y: ROWS-2 };
+                }
+                if (this.id === 1) return { x: player.gridX + player.dirX * 3, y: player.gridY + player.dirY * 3 }; 
+                if (this.id === 2) return { x: player.gridX - player.dirX * 2, y: player.gridY - player.dirY * 2 }; 
+                if (this.id === 3) { 
+                    const dist = Math.abs(this.gridX - player.gridX) + Math.abs(this.gridY - player.gridY);
+                    if (dist < 6) return { x: 1, y: 1 }; return { x: player.gridX, y: player.gridY };
+                }
+                return { x: player.gridX, y: player.gridY };
+            }
+            update() {
+                if (gameState !== 'PLAYING' || !gameStarted) return; 
+                const centerX = getPixelX(this.gridX); const centerY = getPixelY(this.gridY);
+                if (Math.abs(this.px - centerX) <= this.speed && Math.abs(this.py - centerY) <= this.speed) {
+                    this.px = centerX; this.py = centerY; 
+                    
+                    const target = this.getTarget();
+                    let minScore = Infinity;
+                    let bestDir = null;
+                    let fallbackDir = null;
+                    let validCount = 0;
+
+                    // 🔥 정렬(Sort) 배열 생성 로직을 버리고 단순 반복문으로 교체하여 메모리 누수 방지
+                    for(let i=0; i<4; i++) {
+                        const d = GHOST_DIRS[i];
+                        if (d[0] === -this.dirX && d[1] === -this.dirY) continue; // 뒤로 돌기 금지
+                        
+                        const nextX = (this.gridX + d[0] + COLS) % COLS; 
+                        const nextY = this.gridY + d[1];
+                        if(nextY >= 0 && nextY < ROWS && map[nextY][nextX] !== 1) {
+                            validCount++;
+                            fallbackDir = d;
+                            
+                            let distScore = Math.abs(nextX - target.x) + Math.abs(nextY - target.y);
+                            if (isPowerMode) distScore = -distScore; 
+                            
+                            let penalty = 0;
+                            if (currentAIPattern !== 'RUSH') {
+                                for(let g=0; g<ghosts.length; g++) {
+                                    if (ghosts[g].id !== this.id) { 
+                                        if (Math.abs(nextX - ghosts[g].gridX) + Math.abs(nextY - ghosts[g].gridY) === 0) penalty += 15; 
+                                    }
+                                }
+                            }
+                            let finalScore = distScore + penalty;
+                            if (finalScore < minScore) {
+                                minScore = finalScore;
+                                bestDir = d;
+                            }
+                        }
+                    }
+
+                    if(validCount > 0) {
+                        // 10% 확률 랜덤 이동 제외 최단거리 채택
+                        if(!isPowerMode && !isPenaltyMode && Math.random() < 0.1) { this.dirX = fallbackDir[0]; this.dirY = fallbackDir[1]; }
+                        else { this.dirX = bestDir[0]; this.dirY = bestDir[1]; }
+                    } else { 
+                        this.dirX *= -1; this.dirY *= -1; 
+                    }
+                    this.gridX = (this.gridX + this.dirX + COLS) % COLS; this.gridY += this.dirY;
+                }
+                this.px += this.dirX * this.speed; this.py += this.dirY * this.speed;
+                if (this.px < 0) { this.px += canvas.width; this.gridX = COLS - 1; } else if (this.px >= canvas.width) { this.px -= canvas.width; this.gridX = 0; }
+            }
         }
-        const randomIndex = Math.floor(
-          Math.random() * availableQuestions.length,
-        );
-        const randomQuiz = availableQuestions[randomIndex];
-        availableQuestions.splice(randomIndex, 1);
-        kText.innerText = randomQuiz.korean;
-        optionsContainer.innerHTML = '';
-        let options = [randomQuiz.correct, ...randomQuiz.wrong];
-        for (let i = options.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [options[i], options[j]] = [options[j], options[i]];
+
+        const player = new Pacman();
+        const ghosts = [new Ghost("💣", 0, 2.6), new Ghost("👾", 1, 2.4), new Ghost("🤖", 2, 2.5), new Ghost("👹", 3, 2.3)];
+
+        function startRankedGame() {
+            unlockAudio(); 
+            isRankedMode = true; stage = 1;
+            document.getElementById('main-menu-modal').style.display = 'none';
+            document.getElementById('mode-board').innerText = "🔥 본게임";
+            document.getElementById('mode-board').style.color = "#e94560";
+            score = 0; accumulatedTime = 0; updateScore(); initStage();
         }
-        const correctIndex = options.indexOf(randomQuiz.correct);
-        options.forEach((opt, index) => {
-          const btn = document.createElement('button');
-          btn.className = 'option-btn';
-          btn.innerText = opt;
-          btn.onclick = () => checkAnswer(index, correctIndex);
-          optionsContainer.appendChild(btn);
+
+        function startPractice(num) {
+            unlockAudio(); 
+            isRankedMode = false; stage = num;
+            document.getElementById('main-menu-modal').style.display = 'none';
+            document.getElementById('mode-board').innerText = `연습: St.${stage}`;
+            document.getElementById('mode-board').style.color = "#00fff5";
+            score = 0; accumulatedTime = 0; updateScore(); initStage();
+        }
+
+        function initStage() {
+            map = initialMap.map(row => [...row]);
+            totalPellets = 0;
+            activePellets = []; 
+
+            for (let y = 0; y < ROWS; y++) { 
+                for (let x = 0; x < COLS; x++) { 
+                    if (map[y][x] === 2 || map[y][x] === 3) {
+                        totalPellets++; 
+                        activePellets.push({x: x, y: y, type: map[y][x]}); 
+                    }
+                } 
+            }
+            
+            player.reset(9, 15);
+            ghosts[0].reset(9, 7); ghosts[1].reset(8, 9); ghosts[2].reset(9, 9); ghosts[3].reset(10, 9);
+            
+            isPowerMode = false; isPenaltyMode = false;
+            document.getElementById('power-gauge').style.display = 'none'; 
+            clearTimeout(penaltyTimer);
+            
+            currentAIPattern = 'STANDARD'; clearTimeout(aiEventTimer);
+            gameState = 'PLAYING'; gameStarted = false; 
+            
+            if (typeof quizStages !== 'undefined') {
+                let stageIndex = (stage - 1) < quizStages.length ? (stage - 1) : (quizStages.length - 1);
+                availableQuestions = [...quizStages[stageIndex]];
+            } else { availableQuestions = []; }
+            
+            showStatusMessage(`방향키나 터치로 출발하세요!`, "white");
+        }
+
+        function checkCollisions() {
+            if(!gameStarted) return; 
+            for (let ghost of ghosts) {
+                if (Math.sqrt(Math.pow(player.px - ghost.px, 2) + Math.pow(player.py - ghost.py, 2)) < TILE_SIZE * 0.7) {
+                    if (isPowerMode) { ghost.reset(9, 9); score += 200; playSound(sfxCatch); updateScore(); } 
+                    else { 
+                        clearTimeout(aiEventTimer); 
+                        if (isRankedMode) showGameEndUI(false); 
+                        else showPracticeEndUI(false);
+                        return; 
+                    }
+                }
+            }
+        }
+
+        function triggerQuiz() {
+            gameState = 'QUIZ';
+            const modal = document.getElementById('quiz-modal');
+            const kText = document.getElementById('korean-text');
+            const optionsContainer = document.getElementById('options-container');
+            if (availableQuestions.length === 0) {
+                let stageIndex = (stage - 1) < quizStages.length ? (stage - 1) : (quizStages.length - 1);
+                availableQuestions = [...quizStages[stageIndex]];
+            }
+            const randomIndex = Math.floor(Math.random() * availableQuestions.length);
+            const randomQuiz = availableQuestions[randomIndex];
+            availableQuestions.splice(randomIndex, 1); 
+            kText.innerText = randomQuiz.korean; optionsContainer.innerHTML = ''; 
+            let options = [randomQuiz.correct, ...randomQuiz.wrong];
+            for (let i = options.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [options[i], options[j]] = [options[j], options[i]]; }
+            const correctIndex = options.indexOf(randomQuiz.correct);
+            options.forEach((opt, index) => {
+                const btn = document.createElement('button'); btn.className = 'option-btn'; btn.textContent = opt;
+                btn.onclick = () => checkAnswer(index, correctIndex); optionsContainer.appendChild(btn);
+            });
+            modal.style.display = 'block';
+        }
+
+        function checkAnswer(selectedIndex, correctIndex) {
+            document.getElementById('quiz-modal').style.display = 'none';
+            gameState = 'PLAYING';
+            
+            if (selectedIndex === correctIndex) { 
+                playSound(sfxCorrect); score += 50; updateScore(); 
+                showStatusMessage("정답! 🐥 병아리를 잡으세요! (점수 +200)", "#00FF00"); 
+                activatePowerMode(); 
+            } else { 
+                playSound(sfxWrong); score = Math.max(0, score - 30); updateScore(); 
+                showStatusMessage("🚨 오답! 적들의 속도가 빨라집니다!", "#e94560"); 
+                const gameArea = document.getElementById('game-area');
+                gameArea.classList.add('shake-effect');
+                setTimeout(() => { gameArea.classList.remove('shake-effect'); }, 500); 
+                activatePenaltyMode(); 
+            }
+            playSound(bgm); checkWin(); 
+        }
+
+        function checkWin() {
+            if (totalPellets <= 0) {
+                clearTimeout(aiEventTimer); 
+                if (isRankedMode) { if (stage >= 4) showGameEndUI(true); else showStageClearUI(); } 
+                else { showPracticeEndUI(true); }
+            }
+        }
+
+        function showStageClearUI() {
+            gameState = 'STAGE_CLEAR'; bgm.pause(); playSound(sfxClear);
+            const endMsgEl = document.getElementById('game-end-msg');
+            score += 1000; updateScore();
+            endMsgEl.innerHTML = `<div class="title" style="color: #FFD700;">STAGE ${stage} CLEAR!</div><div class="stats">보너스 점수 +1000점!</div><button class="btn-primary" onclick="nextStage()" style="margin-top:20px; width:100%;">다음 스테이지 도전</button>`;
+            endMsgEl.style.display = 'block';
+        }
+
+        function nextStage() { document.getElementById('game-end-msg').style.display = 'none'; stage++; initStage(); }
+
+        function showGameEndUI(isClear) {
+            gameState = 'GAME_END'; bgm.pause(); playSound(isClear ? sfxClear : sfxOver);
+            const endMsgEl = document.getElementById('game-end-msg');
+            if(isClear) score += 3000; 
+            const titleText = isClear ? "🎉 MISSION COMPLETE! 🎉" : "GAME OVER";
+            endMsgEl.innerHTML = `<div class="title" style="color: ${isClear ? '#FFD700' : '#e94560'}; font-size: 32px;">${titleText}</div><div class="stats" style="color:white;">최종 점수: ${score}점</div><div class="stats" style="font-size:16px;">진행 시간: ${accumulatedTime.toFixed(1)}초 (도달: Stage ${stage})</div><input type="text" id="player-name" maxlength="5" placeholder="이름 입력" autocomplete="off"><div class="btn-group"><button class="btn-primary" onclick="saveRank()">랭킹 등록</button></div>`;
+            endMsgEl.style.display = 'block';
+        }
+
+        function showPracticeEndUI(isClear) {
+            gameState = 'GAME_END'; bgm.pause(); playSound(isClear ? sfxClear : sfxOver);
+            const endMsgEl = document.getElementById('game-end-msg');
+            const titleText = isClear ? "🎉 연습 완료! 🎉" : "연습 종료";
+            endMsgEl.innerHTML = `<div class="title" style="color: ${isClear ? '#FFD700' : '#e94560'}; font-size: 32px;">${titleText}</div><div class="stats" style="font-size:16px; color:#aaa; margin-bottom:15px;">연습 모드는 랭킹에 기록되지 않습니다.</div><div class="stats" style="color:white;">획득 점수: ${score}점</div><div class="stats" style="font-size:16px;">연습 시간: ${accumulatedTime.toFixed(1)}초</div><button class="btn-primary" onclick="location.reload()" style="margin-top:20px; width:100%;">메인 화면으로</button>`;
+            endMsgEl.style.display = 'block'; endMsgEl.style.borderColor = isClear ? '#FFD700' : '#e94560';
+        }
+
+        function activatePowerMode() {
+            isPowerMode = true; isPenaltyMode = false;
+            clearTimeout(penaltyTimer); ghosts.forEach(g => g.speed = 1.5); 
+            powerTimeLeft = POWER_DURATION; 
+            document.getElementById('power-gauge').style.display = 'block';
+        }
+
+        function activatePenaltyMode() {
+            isPenaltyMode = true; isPowerMode = false;
+            clearTimeout(penaltyTimer); ghosts.forEach(g => g.speed = g.baseSpeed + 1.2); 
+            penaltyTimer = setTimeout(() => { isPenaltyMode = false; ghosts.forEach(g => g.speed = g.baseSpeed); showStatusMessage("게임을 계속 진행하세요.", "white"); }, 5000); 
+        }
+
+        function updateScore() { document.getElementById('score-board').textContent = "SCORE: " + score; }
+        
+        function saveRank() {
+            const name = document.getElementById('player-name').value.trim() || '무명';
+            let ranks = JSON.parse(localStorage.getItem('chinesePacmanRanks')) || [];
+            ranks.push({ name: name, score: score, time: accumulatedTime.toFixed(1), stageInfo: stage });
+            ranks.sort((a, b) => b.score - a.score);
+            localStorage.setItem('chinesePacmanRanks', JSON.stringify(ranks.slice(0, 5)));
+            showRankBoard();
+        }
+
+        function showRankBoard() {
+            document.getElementById('game-end-msg').style.display = 'none';
+            let ranks = JSON.parse(localStorage.getItem('chinesePacmanRanks')) || [];
+            const ul = document.getElementById('rank-list-ul'); ul.innerHTML = '';
+            if (ranks.length === 0) { ul.innerHTML = '<li class="rank-item" style="justify-content:center;">기록이 없습니다.</li>'; } 
+            else {
+                ranks.forEach((r, i) => {
+                    const displayStage = r.stageInfo !== undefined ? r.stageInfo : (r.stage || 1);
+                    const li = document.createElement('li'); li.className = 'rank-item';
+                    li.innerHTML = `<span style="width: 20%;">${i+1}</span><span style="width: 35%; overflow:hidden;">${r.name}</span><span style="width: 20%; color:#FFD700;">${r.score}</span><span style="width: 25%; text-align:right; font-size:14px; color:#00fff5; line-height: 1.2;">${r.time}s<br><span style="font-size:11px; color:#aaa;">(St.${displayStage})</span></span>`;
+                    ul.appendChild(li);
+                });
+            }
+            document.getElementById('rank-board-modal').style.display = 'block';
+        }
+
+        function showResetConfirm() { document.getElementById('rank-board-modal').style.display = 'none'; document.getElementById('confirm-reset-modal').style.display = 'block'; }
+        function cancelResetRank() { document.getElementById('confirm-reset-modal').style.display = 'none'; document.getElementById('rank-board-modal').style.display = 'block'; }
+        function executeResetRank() { localStorage.removeItem('chinesePacmanRanks'); document.getElementById('confirm-reset-modal').style.display = 'none'; showRankBoard(); }
+
+        function drawMap() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (isPenaltyMode) { ctx.drawImage(penaltyCache, 0, 0); } else { ctx.drawImage(bgCache, 0, 0); }
+
+            ctx.fillStyle = "#fff";
+            ctx.beginPath();
+            for (let i = 0; i < activePellets.length; i++) {
+                if (activePellets[i].type === 2) {
+                    const px = activePellets[i].x * TILE_SIZE + 15;
+                    const py = activePellets[i].y * TILE_SIZE + 15;
+                    ctx.moveTo(px + 2, py); 
+                    ctx.arc(px, py, 2, 0, Math.PI * 2);
+                }
+            }
+            ctx.fill();
+
+            ctx.fillStyle = "#e94560";
+            ctx.beginPath();
+            for (let i = 0; i < activePellets.length; i++) {
+                if (activePellets[i].type === 3) {
+                    const px = activePellets[i].x * TILE_SIZE + 15;
+                    const py = activePellets[i].y * TILE_SIZE + 15;
+                    ctx.moveTo(px + 8, py); 
+                    ctx.arc(px, py, 8, 0, Math.PI * 2);
+                }
+            }
+            ctx.fill();
+        }
+
+        function gameLoop(timestamp) {
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            let deltaTime = (timestamp - lastTimestamp) / 1000; 
+            if(deltaTime > 0.1) deltaTime = 0.1; // 브라우저 최소화 시 시간 폭주 방지
+            lastTimestamp = timestamp;
+            
+            if (gameState === 'PLAYING' && gameStarted) {
+                accumulatedTime += deltaTime; 
+                let newTimerString = "TIME: " + accumulatedTime.toFixed(1) + "s";
+                if (lastTimerString !== newTimerString) {
+                    document.getElementById('timer-board').textContent = newTimerString;
+                    lastTimerString = newTimerString;
+                }
+                
+                if (isPowerMode) {
+                    powerTimeLeft -= deltaTime;
+                    const fillEl = document.getElementById('power-fill');
+                    fillEl.style.width = Math.max(0, (powerTimeLeft / POWER_DURATION) * 100) + '%';
+                    if (powerTimeLeft <= 2.5) fillEl.style.backgroundColor = (Math.floor(powerTimeLeft * 10) % 2 === 0) ? '#fff' : '#FFD700';
+                    else fillEl.style.backgroundColor = '#FFD700';
+
+                    if (powerTimeLeft <= 0) {
+                        isPowerMode = false; ghosts.forEach(g => g.speed = g.baseSpeed);
+                        document.getElementById('power-gauge').style.display = 'none';
+                        showStatusMessage("게임을 계속 진행하세요.", "white");
+                    }
+                }
+            }
+            
+            drawMap(); ghosts.forEach(g => g.draw()); player.draw();
+            if (gameState === 'PLAYING') { player.update(); ghosts.forEach(g => g.update()); checkCollisions(); }
+            requestAnimationFrame(gameLoop);
+        }
+
+        function startGameOnInput() {
+            if (!gameStarted) {
+                unlockAudio();
+                gameStarted = true; showStatusMessage("", ""); playSound(bgm); 
+                aiEventTimer = setTimeout(triggerRandomAIEvent, 5000);
+            }
+        }
+
+        window.addEventListener("keydown", (e) => {
+            if (gameState !== 'PLAYING') return;
+            if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "a", "s", "d", "W", "A", "S", "D"].includes(e.key)) startGameOnInput();
+            if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") { player.nextDirX = 0; player.nextDirY = -1; }
+            else if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") { player.nextDirX = 0; player.nextDirY = 1; }
+            else if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") { player.nextDirX = -1; player.nextDirY = 0; }
+            else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") { player.nextDirX = 1; player.nextDirY = 0; }
         });
-        modal.style.display = 'block';
-      }
 
-      function checkAnswer(selectedIndex, correctIndex) {
-        document.getElementById('quiz-modal').style.display = 'none';
-        gameState = 'PLAYING';
-
-        if (selectedIndex === correctIndex) {
-          playSound(sfxCorrect);
-          score += 50;
-          updateScore();
-          showStatusMessage(
-            '정답! 🐥 병아리를 잡으세요! (점수 +200)',
-            '#00FF00',
-          );
-          activatePowerMode();
-        } else {
-          playSound(sfxWrong);
-          score = Math.max(0, score - 30);
-          updateScore();
-          showStatusMessage('🚨 오답! 적들의 속도가 빨라집니다!', '#e94560');
-          const gameArea = document.getElementById('game-area');
-          gameArea.classList.add('shake-effect');
-          setTimeout(() => {
-            gameArea.classList.remove('shake-effect');
-          }, 500);
-          activatePenaltyMode();
-        }
-        playSound(bgm);
-        checkWin();
-      }
-
-      function checkWin() {
-        if (totalPellets <= 0) {
-          clearTimeout(aiEventTimer);
-          if (isRankedMode) {
-            if (stage >= 4) showGameEndUI(true);
-            else showStageClearUI();
-          } else {
-            showPracticeEndUI(true);
-          }
-        }
-      }
-
-      function showStageClearUI() {
-        gameState = 'STAGE_CLEAR';
-        bgm.pause();
-        playSound(sfxClear);
-        const endMsgEl = document.getElementById('game-end-msg');
-        score += 1000;
-        updateScore();
-        endMsgEl.innerHTML = `<div class="title" style="color: #FFD700;">STAGE ${stage} CLEAR!</div><div class="stats">보너스 점수 +1000점!</div><button class="btn-primary" onclick="nextStage()" style="margin-top:20px; width:100%;">다음 스테이지 도전</button>`;
-        endMsgEl.style.display = 'block';
-      }
-
-      function nextStage() {
-        document.getElementById('game-end-msg').style.display = 'none';
-        stage++;
-        initStage();
-      }
-
-      function showGameEndUI(isClear) {
-        gameState = 'GAME_END';
-        bgm.pause();
-        playSound(isClear ? sfxClear : sfxOver);
-        const endMsgEl = document.getElementById('game-end-msg');
-        if (isClear) score += 3000;
-        const titleText = isClear ? '🎉 MISSION COMPLETE! 🎉' : 'GAME OVER';
-        endMsgEl.innerHTML = `<div class="title" style="color: ${isClear ? '#FFD700' : '#e94560'}; font-size: 32px;">${titleText}</div><div class="stats" style="color:white;">최종 점수: ${score}점</div><div class="stats" style="font-size:16px;">진행 시간: ${accumulatedTime.toFixed(1)}초 (도달: Stage ${stage})</div><input type="text" id="player-name" maxlength="5" placeholder="이름 입력" autocomplete="off"><div class="btn-group"><button class="btn-primary" onclick="saveRank()">랭킹 등록</button></div>`;
-        endMsgEl.style.display = 'block';
-      }
-
-      function showPracticeEndUI(isClear) {
-        gameState = 'GAME_END';
-        bgm.pause();
-        playSound(isClear ? sfxClear : sfxOver);
-        const endMsgEl = document.getElementById('game-end-msg');
-        const titleText = isClear ? '🎉 연습 완료! 🎉' : '연습 종료';
-        endMsgEl.innerHTML = `<div class="title" style="color: ${isClear ? '#FFD700' : '#e94560'}; font-size: 32px;">${titleText}</div><div class="stats" style="font-size:16px; color:#aaa; margin-bottom:15px;">연습 모드는 랭킹에 기록되지 않습니다.</div><div class="stats" style="color:white;">획득 점수: ${score}점</div><div class="stats" style="font-size:16px;">연습 시간: ${accumulatedTime.toFixed(1)}초</div><button class="btn-primary" onclick="location.reload()" style="margin-top:20px; width:100%;">메인 화면으로</button>`;
-        endMsgEl.style.display = 'block';
-        endMsgEl.style.borderColor = isClear ? '#FFD700' : '#e94560';
-      }
-
-      function activatePowerMode() {
-        isPowerMode = true;
-        isPenaltyMode = false;
-        clearTimeout(penaltyTimer);
-        ghosts.forEach((g) => (g.speed = 1.5));
-        powerTimeLeft = POWER_DURATION;
-        document.getElementById('power-gauge').style.display = 'block';
-      }
-
-      function activatePenaltyMode() {
-        isPenaltyMode = true;
-        isPowerMode = false;
-        clearTimeout(penaltyTimer);
-        ghosts.forEach((g) => (g.speed = g.baseSpeed + 1.2));
-        penaltyTimer = setTimeout(() => {
-          isPenaltyMode = false;
-          ghosts.forEach((g) => (g.speed = g.baseSpeed));
-          showStatusMessage('게임을 계속 진행하세요.', 'white');
-        }, 5000);
-      }
-
-      function updateScore() {
-        document.getElementById('score-board').innerText = 'SCORE: ' + score;
-      }
-
-      function saveRank() {
-        const name =
-          document.getElementById('player-name').value.trim() || '무명';
-        let ranks =
-          JSON.parse(localStorage.getItem('chinesePacmanRanks')) || [];
-        ranks.push({
-          name: name,
-          score: score,
-          time: accumulatedTime.toFixed(1),
-          stageInfo: stage,
-        });
-        ranks.sort((a, b) => b.score - a.score);
-        localStorage.setItem(
-          'chinesePacmanRanks',
-          JSON.stringify(ranks.slice(0, 5)),
-        );
-        showRankBoard();
-      }
-
-      function showRankBoard() {
-        document.getElementById('game-end-msg').style.display = 'none';
-        let ranks =
-          JSON.parse(localStorage.getItem('chinesePacmanRanks')) || [];
-        const ul = document.getElementById('rank-list-ul');
-        ul.innerHTML = '';
-        if (ranks.length === 0) {
-          ul.innerHTML =
-            '<li class="rank-item" style="justify-content:center;">기록이 없습니다.</li>';
-        } else {
-          ranks.forEach((r, i) => {
-            const displayStage =
-              r.stageInfo !== undefined ? r.stageInfo : r.stage || 1;
-            const li = document.createElement('li');
-            li.className = 'rank-item';
-            li.innerHTML = `<span style="width: 20%;">${i + 1}</span><span style="width: 35%; overflow:hidden;">${r.name}</span><span style="width: 20%; color:#FFD700;">${r.score}</span><span style="width: 25%; text-align:right; font-size:14px; color:#00fff5; line-height: 1.2;">${r.time}s<br><span style="font-size:11px; color:#aaa;">(St.${displayStage})</span></span>`;
-            ul.appendChild(li);
-          });
-        }
-        document.getElementById('rank-board-modal').style.display = 'block';
-      }
-
-      function showResetConfirm() {
-        document.getElementById('rank-board-modal').style.display = 'none';
-        document.getElementById('confirm-reset-modal').style.display = 'block';
-      }
-      function cancelResetRank() {
-        document.getElementById('confirm-reset-modal').style.display = 'none';
-        document.getElementById('rank-board-modal').style.display = 'block';
-      }
-      function executeResetRank() {
-        localStorage.removeItem('chinesePacmanRanks');
-        document.getElementById('confirm-reset-modal').style.display = 'none';
-        showRankBoard();
-      }
-
-      function drawMap() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        if (isPenaltyMode) {
-          ctx.drawImage(penaltyCache, 0, 0);
-        } else {
-          ctx.drawImage(bgCache, 0, 0);
-        }
-
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        for (let y = 0; y < ROWS; y++) {
-          for (let x = 0; x < COLS; x++) {
-            if (map[y][x] === 2) {
-              const px = x * TILE_SIZE + TILE_SIZE / 2;
-              const py = y * TILE_SIZE + TILE_SIZE / 2;
-              ctx.moveTo(px + 2, py);
-              ctx.arc(px, py, 2, 0, Math.PI * 2);
-            }
-          }
-        }
-        ctx.fill();
-
-        ctx.fillStyle = '#e94560';
-        ctx.beginPath();
-        for (let y = 0; y < ROWS; y++) {
-          for (let x = 0; x < COLS; x++) {
-            if (map[y][x] === 3) {
-              const px = x * TILE_SIZE + TILE_SIZE / 2;
-              const py = y * TILE_SIZE + TILE_SIZE / 2;
-              ctx.moveTo(px + 8, py);
-              ctx.arc(px, py, 8, 0, Math.PI * 2);
-            }
-          }
-        }
-        ctx.fill();
-
-        ctx.fillStyle = 'rgba(233, 69, 96, 0.3)';
-        for (let y = 0; y < ROWS; y++) {
-          for (let x = 0; x < COLS; x++) {
-            if (map[y][x] === 4) {
-              ctx.fillRect(
-                x * TILE_SIZE,
-                y * TILE_SIZE + TILE_SIZE / 2 - 2,
-                TILE_SIZE,
-                4,
-              );
-            }
-          }
-        }
-      }
-
-      function gameLoop(timestamp) {
-        if (!lastTimestamp) lastTimestamp = timestamp;
-        const deltaTime = (timestamp - lastTimestamp) / 1000;
-        lastTimestamp = timestamp;
-
-        if (gameState === 'PLAYING' && gameStarted) {
-          accumulatedTime += deltaTime;
-          let newTimerString = 'TIME: ' + accumulatedTime.toFixed(1) + 's';
-          if (lastTimerString !== newTimerString) {
-            document.getElementById('timer-board').innerText = newTimerString;
-            lastTimerString = newTimerString;
-          }
-
-          if (isPowerMode) {
-            powerTimeLeft -= deltaTime;
-            const fillEl = document.getElementById('power-fill');
-            fillEl.style.width =
-              Math.max(0, (powerTimeLeft / POWER_DURATION) * 100) + '%';
-            if (powerTimeLeft <= 2.5)
-              fillEl.style.backgroundColor =
-                Math.floor(powerTimeLeft * 10) % 2 === 0 ? '#fff' : '#FFD700';
-            else fillEl.style.backgroundColor = '#FFD700';
-
-            if (powerTimeLeft <= 0) {
-              isPowerMode = false;
-              ghosts.forEach((g) => (g.speed = g.baseSpeed));
-              document.getElementById('power-gauge').style.display = 'none';
-              showStatusMessage('게임을 계속 진행하세요.', 'white');
-            }
-          }
-        }
-
-        drawMap();
-        ghosts.forEach((g) => g.draw());
-        player.draw();
-        if (gameState === 'PLAYING') {
-          player.update();
-          ghosts.forEach((g) => g.update());
-          checkCollisions();
-        }
-        requestAnimationFrame(gameLoop);
-      }
-
-      function startGameOnInput() {
-        if (!gameStarted) {
-          gameStarted = true;
-          showStatusMessage('', '');
-          playSound(bgm);
-          aiEventTimer = setTimeout(triggerRandomAIEvent, 5000);
-        }
-      }
-
-      window.addEventListener('keydown', (e) => {
-        if (gameState !== 'PLAYING') return;
-        if (
-          [
-            'ArrowUp',
-            'ArrowDown',
-            'ArrowLeft',
-            'ArrowRight',
-            'w',
-            'a',
-            's',
-            'd',
-            'W',
-            'A',
-            'S',
-            'D',
-          ].includes(e.key)
-        )
-          startGameOnInput();
-        if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
-          player.nextDirX = 0;
-          player.nextDirY = -1;
-        } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
-          player.nextDirX = 0;
-          player.nextDirY = 1;
-        } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-          player.nextDirX = -1;
-          player.nextDirY = 0;
-        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-          player.nextDirX = 1;
-          player.nextDirY = 0;
-        }
-      });
-
-      window.handleVirtualPad = function (dir, e) {
-        if (e) e.preventDefault();
-        if (gameState !== 'PLAYING') return;
-        startGameOnInput();
-        if (dir === 'up') {
-          player.nextDirX = 0;
-          player.nextDirY = -1;
-        } else if (dir === 'down') {
-          player.nextDirX = 0;
-          player.nextDirY = 1;
-        } else if (dir === 'left') {
-          player.nextDirX = -1;
-          player.nextDirY = 0;
-        } else if (dir === 'right') {
-          player.nextDirX = 1;
-          player.nextDirY = 0;
-        }
-      };
-
-      let swipeStartX = null;
-      let swipeStartY = null;
-      const SWIPE_THRESHOLD = 20;
-
-      window.addEventListener(
-        'touchstart',
-        (e) => {
-          if (e.target.closest('.dpad-btn') || e.target.closest('button'))
-            return;
-          swipeStartX = e.touches[0].clientX;
-          swipeStartY = e.touches[0].clientY;
-        },
-        { passive: false },
-      );
-
-      window.addEventListener(
-        'touchmove',
-        (e) => {
-          if (gameState === 'PLAYING') e.preventDefault();
-          if (
-            !swipeStartX ||
-            !swipeStartY ||
-            e.target.closest('.dpad-btn') ||
-            e.target.closest('button')
-          )
-            return;
-
-          let touchX = e.touches[0].clientX;
-          let touchY = e.touches[0].clientY;
-          let dx = touchX - swipeStartX;
-          let dy = touchY - swipeStartY;
-
-          if (
-            Math.abs(dx) > SWIPE_THRESHOLD ||
-            Math.abs(dy) > SWIPE_THRESHOLD
-          ) {
+        window.handleVirtualPad = function(dir, e) {
+            if(e) e.preventDefault(); 
+            if (gameState !== 'PLAYING') return;
             startGameOnInput();
-            if (Math.abs(dx) > Math.abs(dy)) {
-              if (dx > 0) {
-                player.nextDirX = 1;
-                player.nextDirY = 0;
-              } else {
-                player.nextDirX = -1;
-                player.nextDirY = 0;
-              }
-            } else {
-              if (dy > 0) {
-                player.nextDirX = 0;
-                player.nextDirY = 1;
-              } else {
-                player.nextDirX = 0;
-                player.nextDirY = -1;
-              }
+            if (dir === 'up') { player.nextDirX = 0; player.nextDirY = -1; }
+            else if (dir === 'down') { player.nextDirX = 0; player.nextDirY = 1; }
+            else if (dir === 'left') { player.nextDirX = -1; player.nextDirY = 0; }
+            else if (dir === 'right') { player.nextDirX = 1; player.nextDirY = 0; }
+        };
+
+        let swipeStartX = null; let swipeStartY = null;
+        const SWIPE_THRESHOLD = 20;
+
+        window.addEventListener('touchstart', e => {
+            if (e.target.closest('.dpad-btn') || e.target.closest('button')) return; 
+            swipeStartX = e.touches[0].clientX; swipeStartY = e.touches[0].clientY;
+        }, {passive: false});
+
+        window.addEventListener('touchmove', e => {
+            if (gameState === 'PLAYING') e.preventDefault(); 
+            if (!swipeStartX || !swipeStartY || e.target.closest('.dpad-btn') || e.target.closest('button')) return;
+
+            let touchX = e.touches[0].clientX; let touchY = e.touches[0].clientY;
+            let dx = touchX - swipeStartX; let dy = touchY - swipeStartY;
+
+            if (Math.abs(dx) > SWIPE_THRESHOLD || Math.abs(dy) > SWIPE_THRESHOLD) {
+                startGameOnInput();
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    if (dx > 0) { player.nextDirX = 1; player.nextDirY = 0; } 
+                    else { player.nextDirX = -1; player.nextDirY = 0; } 
+                } else {
+                    if (dy > 0) { player.nextDirX = 0; player.nextDirY = 1; } 
+                    else { player.nextDirX = 0; player.nextDirY = -1; } 
+                }
+                swipeStartX = touchX; swipeStartY = touchY;
             }
-            swipeStartX = touchX;
-            swipeStartY = touchY;
-          }
-        },
-        { passive: false },
-      );
+        }, {passive: false});
 
-      window.addEventListener('touchend', (e) => {
-        swipeStartX = null;
-        swipeStartY = null;
-      });
+        window.addEventListener('touchend', e => { swipeStartX = null; swipeStartY = null; });
 
-      initStage();
-      gameState = 'WAITING';
-      document.getElementById('main-menu-modal').style.display = 'block';
+        initStage();
+        gameState = 'WAITING'; 
+        document.getElementById('main-menu-modal').style.display = 'block';
 
-      requestAnimationFrame(gameLoop);
+        requestAnimationFrame(gameLoop); 
     </script>
-  </body>
+</body>
 </html>

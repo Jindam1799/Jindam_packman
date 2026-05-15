@@ -234,6 +234,9 @@
         grid-template-columns: 1fr 1fr;
         gap: 10px;
         margin-top: 15px;
+        max-height: 200px;
+        overflow-y: auto;
+        padding-right: 5px;
       }
       .stage-select-btn {
         padding: 10px;
@@ -426,6 +429,19 @@
         transform: scale(0.9);
       }
 
+      /* 스크롤바 디자인 */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #16213e;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #00fff5;
+        border-radius: 4px;
+      }
+
       @media (max-width: 768px) {
         #mobile-controls {
           display: flex;
@@ -460,15 +476,14 @@
         <div id="main-menu-modal" class="modal">
           <h2 style="margin-top: 0">🎮 게임 모드 선택</h2>
           <button class="main-game-btn" onclick="startRankedGame()">
-            🔥 챌린지 시작<br /><span
-              style="font-size: 12px; font-weight: normal"
-              >(St.1~4 연속 플레이 / 랭킹 도전)</span
+            🔥 노말 모드<br /><span style="font-size: 12px; font-weight: normal"
+              >(모든 스테이지 연속 플레이 / 랭킹 도전)</span
             >
           </button>
 
           <button class="hell-game-btn" onclick="startHellMode()">
             😈 지옥 모드<br /><span style="font-size: 12px; font-weight: normal"
-              >(적 6마리 / 랭킹 도전)</span
+              >(적 6마리, 모든 스테이지 / 랭킹 도전)</span
             >
           </button>
 
@@ -476,20 +491,7 @@
           <p style="margin: 0; font-size: 14px; color: #aaa">
             📖 연습 모드 (랭킹 미기록)
           </p>
-          <div class="stage-btn-grid">
-            <button class="stage-select-btn" onclick="startPractice(1)">
-              St.1 기초 인사
-            </button>
-            <button class="stage-select-btn" onclick="startPractice(2)">
-              St.2 오다(来)
-            </button>
-            <button class="stage-select-btn" onclick="startPractice(3)">
-              St.3 듣다(听)
-            </button>
-            <button class="stage-select-btn" onclick="startPractice(4)">
-              St.4 보다(看)
-            </button>
-          </div>
+          <div class="stage-btn-grid" id="practice-btn-container"></div>
         </div>
 
         <div id="quiz-modal" class="modal">
@@ -566,14 +568,13 @@
     </div>
 
     <script>
-      // 🔥 BGM 및 효과음 설정 (hell.mp3 추가)
       const bgmNormal = new Audio('bgm.mp3');
       bgmNormal.loop = true;
       bgmNormal.volume = 0.4;
       const bgmHell = new Audio('hell.mp3');
       bgmHell.loop = true;
       bgmHell.volume = 0.4;
-      let currentBgm = bgmNormal; // 현재 재생할 BGM 변수
+      let currentBgm = bgmNormal;
 
       const sfxEat = new Audio('eat.mp3');
       sfxEat.volume = 0.2;
@@ -608,11 +609,9 @@
         if (playPromise !== undefined) playPromise.catch((error) => {});
       }
 
+      // 🔥 깜빡임 유발 속성(desynchronized) 제거
       const canvas = document.getElementById('gameCanvas');
-      const ctx = canvas.getContext('2d', {
-        alpha: false,
-        desynchronized: true,
-      });
+      const ctx = canvas.getContext('2d', { alpha: false });
       const TILE_SIZE = 30;
 
       let gameState = 'WAITING',
@@ -690,15 +689,19 @@
 
       function preDrawBackgrounds() {
         const palettes = [
-          { bg: '#16213e', border: '#0f3460' }, // St.1 파랑
-          { bg: '#1e3b2b', border: '#0f2918' }, // St.2 초록
-          { bg: '#2d1b36', border: '#1a0f20' }, // St.3 보라
-          { bg: '#362b1b', border: '#20190f' }, // St.4 주황
-          { bg: '#3a0b16', border: '#5c0000' }, // 지옥 모드
+          { bg: '#16213e', border: '#0f3460' }, // 파랑
+          { bg: '#1e3b2b', border: '#0f2918' }, // 초록
+          { bg: '#2d1b36', border: '#1a0f20' }, // 보라
+          { bg: '#362b1b', border: '#20190f' }, // 주황
         ];
 
-        let pIdx = isHellMode ? 4 : Math.min(stage - 1, 3);
-        let p = palettes[pIdx];
+        let p;
+        if (isHellMode) {
+          p = { bg: '#3a0b16', border: '#5c0000' };
+        } else {
+          let pIdx = (stage - 1) % palettes.length;
+          p = palettes[pIdx];
+        }
 
         bgCtx.fillStyle = '#0f3460';
         bgCtx.fillRect(0, 0, bgCache.width, bgCache.height);
@@ -765,7 +768,7 @@
         clearTimeout(aiEventTimer);
         clearTimeout(penaltyTimer);
         currentBgm.pause();
-        currentBgm.currentTime = 0; // 🔥 현재 재생중인 BGM 정지
+        currentBgm.currentTime = 0;
 
         gameState = 'WAITING';
         gameStarted = false;
@@ -926,7 +929,7 @@
                 playSound(sfxQuiz);
                 updateScore();
                 triggerQuiz();
-              } // 🔥 currentBgm 사용
+              }
             }
           }
         }
@@ -1118,14 +1121,32 @@
       ];
       let activeGhosts = [];
 
+      function generatePracticeButtons() {
+        const container = document.getElementById('practice-btn-container');
+        container.innerHTML = '';
+
+        if (typeof quizStages !== 'undefined' && quizStages.length > 0) {
+          for (let i = 0; i < quizStages.length; i++) {
+            const btn = document.createElement('button');
+            btn.className = 'stage-select-btn';
+            btn.onclick = () => startPractice(i + 1);
+            btn.textContent = `St.${i + 1} 연습`;
+            container.appendChild(btn);
+          }
+        } else {
+          container.innerHTML =
+            '<span style="color:#aaa;">데이터가 없습니다.</span>';
+        }
+      }
+
       function startRankedGame() {
-        currentBgm = bgmNormal; // 🔥 기본 BGM 세팅
+        currentBgm = bgmNormal;
         unlockAudio();
         isRankedMode = true;
         isHellMode = false;
         stage = 1;
         document.getElementById('main-menu-modal').style.display = 'none';
-        document.getElementById('mode-board').innerText = '🔥 챌린지';
+        document.getElementById('mode-board').innerText = '🔥 노말 모드';
         document.getElementById('mode-board').style.color = '#e94560';
         score = 0;
         accumulatedTime = 0;
@@ -1134,7 +1155,7 @@
       }
 
       function startHellMode() {
-        currentBgm = bgmHell; // 🔥 지옥 모드 BGM 세팅
+        currentBgm = bgmHell;
         unlockAudio();
         isRankedMode = true;
         isHellMode = true;
@@ -1149,7 +1170,7 @@
       }
 
       function startPractice(num) {
-        currentBgm = bgmNormal; // 🔥 기본 BGM 세팅
+        currentBgm = bgmNormal;
         unlockAudio();
         isRankedMode = false;
         isHellMode = false;
@@ -1173,6 +1194,8 @@
           map[13][14] = 3;
         }
 
+        preDrawBackgrounds();
+
         totalPellets = 0;
         activePellets = [];
         catchEffects = [];
@@ -1184,8 +1207,6 @@
             }
           }
         }
-
-        preDrawBackgrounds();
 
         player.reset(9, 15);
         activeGhosts = isHellMode ? allGhosts : allGhosts.slice(0, 4);
@@ -1314,7 +1335,6 @@
           activatePenaltyMode();
         }
 
-        // 🔥 선택된 현재 BGM을 정지 없이 이어서 재생
         let playPromise = currentBgm.play();
         if (playPromise !== undefined) playPromise.catch((error) => {});
         checkWin();
@@ -1324,13 +1344,14 @@
         if (totalPellets <= 0) {
           clearTimeout(aiEventTimer);
           if (isRankedMode) {
-            if (stage >= 4) showGameEndUI(true);
+            if (stage >= quizStages.length) showGameEndUI(true);
             else showStageClearUI();
           } else {
             showPracticeEndUI(true);
           }
         }
       }
+
       function showStageClearUI() {
         gameState = 'STAGE_CLEAR';
         currentBgm.pause();
@@ -1567,7 +1588,7 @@
           showStatusMessage('', '');
           playSound(currentBgm);
           aiEventTimer = setTimeout(triggerRandomAIEvent, 5000);
-        } // 🔥 선택된 현재 BGM 재생
+        }
       }
 
       window.addEventListener('keydown', (e) => {
@@ -1684,6 +1705,7 @@
         swipeStartY = null;
       });
 
+      generatePracticeButtons();
       initStage();
       gameState = 'WAITING';
       document.getElementById('main-menu-modal').style.display = 'block';

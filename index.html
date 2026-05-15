@@ -355,7 +355,7 @@
         border-color: #e94560;
       }
 
-      /* 가상 조이스틱 영역 */
+      /* 🔥 가상 조이스틱 버튼 클릭 반응성 상향 */
       #mobile-controls {
         display: none;
         flex-direction: column;
@@ -495,11 +495,28 @@
     </div>
 
     <div id="mobile-controls">
-      <button class="dpad-btn" id="btn-up">▲</button>
+      <button class="dpad-btn" onpointerdown="handleVirtualPad('up', event)">
+        ▲
+      </button>
       <div class="dpad-row">
-        <button class="dpad-btn" id="btn-left">◀</button>
-        <button class="dpad-btn" id="btn-down">▼</button>
-        <button class="dpad-btn" id="btn-right">▶</button>
+        <button
+          class="dpad-btn"
+          onpointerdown="handleVirtualPad('left', event)"
+        >
+          ◀
+        </button>
+        <button
+          class="dpad-btn"
+          onpointerdown="handleVirtualPad('down', event)"
+        >
+          ▼
+        </button>
+        <button
+          class="dpad-btn"
+          onpointerdown="handleVirtualPad('right', event)"
+        >
+          ▶
+        </button>
       </div>
     </div>
 
@@ -544,8 +561,9 @@
       let availableQuestions = [];
       let currentAIPattern = 'STANDARD';
       let aiEventTimer = null;
-      let lastTimerString = ''; // DOM 업데이트 제한을 위한 변수
+      let lastTimerString = '';
 
+      // 🔥 맵 디자인 수정: 유령의 집(정중앙) 빼고 펠릿(2)으로 꽉 채움
       const initialMap = [
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         [1, 3, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 3, 1],
@@ -553,11 +571,11 @@
         [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
         [1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1],
         [1, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 1],
-        [1, 1, 1, 1, 2, 1, 1, 1, 0, 1, 0, 1, 1, 1, 2, 1, 1, 1, 1],
-        [0, 0, 0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 0, 0],
-        [1, 1, 1, 1, 2, 1, 0, 1, 1, 4, 1, 1, 0, 1, 2, 1, 1, 1, 1],
-        [1, 2, 2, 2, 2, 2, 0, 1, 0, 0, 0, 1, 0, 2, 2, 2, 2, 2, 1],
-        [1, 2, 1, 1, 2, 1, 0, 1, 1, 1, 1, 1, 0, 1, 2, 1, 1, 2, 1],
+        [1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1],
+        [0, 0, 0, 0, 2, 1, 2, 2, 0, 0, 0, 2, 2, 1, 2, 0, 0, 0, 0],
+        [1, 1, 1, 1, 2, 1, 2, 1, 1, 4, 1, 1, 2, 1, 2, 1, 1, 1, 1],
+        [1, 2, 2, 2, 2, 2, 2, 1, 0, 0, 0, 1, 2, 2, 2, 2, 2, 2, 1],
+        [1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1],
         [1, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 2, 1],
         [1, 1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1],
         [1, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 1],
@@ -1228,18 +1246,15 @@
         showRankBoard();
       }
 
-      // 🔥 모바일 프레임 완벽 방어: 점(원)들을 한 번에 그리기 (Batch Rendering)
       function drawMap() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 캐싱된 배경 이미지 도장 찍기
         if (isPenaltyMode) {
           ctx.drawImage(penaltyCache, 0, 0);
         } else {
           ctx.drawImage(bgCache, 0, 0);
         }
 
-        // 1. 하얀색 작은 점 펠릿 렌더링
         ctx.fillStyle = '#fff';
         ctx.beginPath();
         for (let y = 0; y < ROWS; y++) {
@@ -1247,14 +1262,13 @@
             if (map[y][x] === 2) {
               const px = x * TILE_SIZE + TILE_SIZE / 2;
               const py = y * TILE_SIZE + TILE_SIZE / 2;
-              ctx.moveTo(px + 2, py); // 선이 이어지지 않도록 이동
+              ctx.moveTo(px + 2, py);
               ctx.arc(px, py, 2, 0, Math.PI * 2);
             }
           }
         }
         ctx.fill();
 
-        // 2. 파워 펠릿 렌더링 (🔥다시 예쁜 빨간 원형으로 복구)
         ctx.fillStyle = '#e94560';
         ctx.beginPath();
         for (let y = 0; y < ROWS; y++) {
@@ -1269,7 +1283,6 @@
         }
         ctx.fill();
 
-        // 3. 유령 게이트
         ctx.fillStyle = 'rgba(233, 69, 96, 0.3)';
         for (let y = 0; y < ROWS; y++) {
           for (let x = 0; x < COLS; x++) {
@@ -1292,8 +1305,6 @@
 
         if (gameState === 'PLAYING' && gameStarted) {
           accumulatedTime += deltaTime;
-
-          // 🔥 DOM 최적화: 타이머 텍스트가 바뀔 때만 화면 갱신 (모바일 과부하 차단)
           let newTimerString = 'TIME: ' + accumulatedTime.toFixed(1) + 's';
           if (lastTimerString !== newTimerString) {
             document.getElementById('timer-board').innerText = newTimerString;
@@ -1374,7 +1385,7 @@
       });
 
       window.handleVirtualPad = function (dir, e) {
-        e.preventDefault();
+        if (e) e.preventDefault();
         if (gameState !== 'PLAYING') return;
         startGameOnInput();
         if (dir === 'up') {
@@ -1399,7 +1410,8 @@
       window.addEventListener(
         'touchstart',
         (e) => {
-          if (e.target.closest('button')) return;
+          if (e.target.closest('.dpad-btn') || e.target.closest('button'))
+            return;
           swipeStartX = e.touches[0].clientX;
           swipeStartY = e.touches[0].clientY;
         },
@@ -1410,7 +1422,12 @@
         'touchmove',
         (e) => {
           if (gameState === 'PLAYING') e.preventDefault();
-          if (!swipeStartX || !swipeStartY || e.target.closest('button'))
+          if (
+            !swipeStartX ||
+            !swipeStartY ||
+            e.target.closest('.dpad-btn') ||
+            e.target.closest('button')
+          )
             return;
 
           let touchX = e.touches[0].clientX;

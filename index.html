@@ -21,7 +21,7 @@
         margin: 0;
         font-family: 'Malgun Gothic', sans-serif;
         overflow: hidden;
-        touch-action: none; /* 모바일 새로고침 방지 */
+        touch-action: none;
       }
 
       @keyframes shake {
@@ -64,7 +64,6 @@
         animation-iteration-count: 1;
       }
 
-      /* 🔥 모바일 반응형을 위한 사이즈 조정 (max-width 적용) */
       #game-area {
         position: relative;
         border: 4px solid #16213e;
@@ -79,7 +78,7 @@
         border-radius: 10px;
         width: 100%;
         height: auto;
-      } /* 캔버스가 화면에 맞춰 줄어듦 */
+      }
       #ui-layer {
         position: absolute;
         top: 0;
@@ -354,7 +353,6 @@
         border-color: #e94560;
       }
 
-      /* 🔥 모바일 전용 가상 조이스틱 (D-Pad) */
       #mobile-controls {
         display: none;
         flex-direction: column;
@@ -388,8 +386,6 @@
         color: #16213e;
         transform: scale(0.9);
       }
-
-      /* 화면이 좁은 모바일 환경에서만 조이스틱 표시 */
       @media (max-width: 768px) {
         #mobile-controls {
           display: flex;
@@ -593,6 +589,50 @@
       canvas.width = COLS * TILE_SIZE;
       canvas.height = ROWS * TILE_SIZE;
 
+      // 🔥 모바일 프레임 드랍 최적화: 배경 캐싱 캔버스 생성
+      const bgCache = document.createElement('canvas');
+      bgCache.width = canvas.width;
+      bgCache.height = canvas.height;
+      const bgCtx = bgCache.getContext('2d');
+
+      const penaltyCache = document.createElement('canvas');
+      penaltyCache.width = canvas.width;
+      penaltyCache.height = canvas.height;
+      const penaltyCtx = penaltyCache.getContext('2d');
+
+      // 게임 시작 전 배경 벽들을 미리 한 번만 그려둠
+      function preDrawBackgrounds() {
+        bgCtx.clearRect(0, 0, bgCache.width, bgCache.height);
+        penaltyCtx.clearRect(0, 0, penaltyCache.width, penaltyCache.height);
+
+        for (let y = 0; y < ROWS; y++) {
+          for (let x = 0; x < COLS; x++) {
+            const tile = initialMap[y][x];
+            const px = x * TILE_SIZE;
+            const py = y * TILE_SIZE;
+            if (tile === 1) {
+              // 일반 모드 벽 캐싱
+              bgCtx.fillStyle = '#16213e';
+              bgCtx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+              bgCtx.strokeStyle = '#0f3460';
+              bgCtx.strokeRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+
+              // 페널티 모드 벽 캐싱 (붉은색)
+              penaltyCtx.fillStyle = '#3a0b16';
+              penaltyCtx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+              penaltyCtx.strokeStyle = '#e94560';
+              penaltyCtx.strokeRect(
+                px + 2,
+                py + 2,
+                TILE_SIZE - 4,
+                TILE_SIZE - 4,
+              );
+            }
+          }
+        }
+      }
+      preDrawBackgrounds(); // 스크립트 로드 시 1회 실행
+
       function getPixelX(gridX) {
         return gridX * TILE_SIZE + TILE_SIZE / 2;
       }
@@ -664,13 +704,9 @@
           ctx.translate(this.px, this.py);
           ctx.rotate(this.angle);
           ctx.beginPath();
-          if (isPowerMode) {
-            ctx.fillStyle = '#FFD700';
-          } else if (isPenaltyMode) {
-            ctx.fillStyle = '#ffb8ae';
-          } else {
-            ctx.fillStyle = '#00fff5';
-          }
+          if (isPowerMode) ctx.fillStyle = '#FFD700';
+          else if (isPenaltyMode) ctx.fillStyle = '#ffb8ae';
+          else ctx.fillStyle = '#00fff5';
           ctx.arc(
             0,
             0,
@@ -795,6 +831,7 @@
             return { x: 9, y: 7 };
           if (isPowerMode || isPenaltyMode || this.id === 0)
             return { x: player.gridX, y: player.gridY };
+
           if (currentAIPattern === 'RUSH') {
             return { x: player.gridX, y: player.gridY };
           } else if (currentAIPattern === 'AMBUSH') {
@@ -808,6 +845,7 @@
             if (this.id === 2) return { x: 1, y: ROWS - 2 };
             if (this.id === 3) return { x: COLS - 2, y: ROWS - 2 };
           }
+
           if (this.id === 1)
             return {
               x: player.gridX + player.dirX * 3,
@@ -1193,19 +1231,24 @@
         showRankBoard();
       }
 
+      // 🔥 최적화: 매 프레임마다 복잡한 도형을 그리는 대신, 캐시된 도화지를 도장 찍듯 복사!
       function drawMap() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. 캐시된 배경을 한 번에 복사 (프레임 드랍 완벽 해결)
+        if (isPenaltyMode) {
+          ctx.drawImage(penaltyCache, 0, 0);
+        } else {
+          ctx.drawImage(bgCache, 0, 0);
+        }
+
+        // 2. 먹을 수 있는 점(펠렛)들만 새로 그림
         for (let y = 0; y < ROWS; y++) {
           for (let x = 0; x < COLS; x++) {
             const tile = map[y][x];
             const px = x * TILE_SIZE;
             const py = y * TILE_SIZE;
-            if (tile === 1) {
-              ctx.fillStyle = isPenaltyMode ? '#3a0b16' : '#16213e';
-              ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-              ctx.strokeStyle = isPenaltyMode ? '#e94560' : '#0f3460';
-              ctx.strokeRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-            } else if (tile === 2) {
+            if (tile === 2) {
               ctx.fillStyle = '#fff';
               ctx.beginPath();
               ctx.arc(
@@ -1275,7 +1318,6 @@
         requestAnimationFrame(gameLoop);
       }
 
-      // 🔥 모바일 & PC 통합 조작 처리 로직 (키보드, 스와이프, 버튼)
       function startGameOnInput() {
         if (!gameStarted) {
           gameStarted = true;
@@ -1319,9 +1361,8 @@
         }
       });
 
-      // 🔥 가상 조이스틱 버튼 동작
       window.handleVirtualPad = function (dir, e) {
-        e.preventDefault(); // 더블 탭 확대 방지
+        e.preventDefault();
         if (gameState !== 'PLAYING') return;
         startGameOnInput();
         if (dir === 'up') {
@@ -1339,13 +1380,12 @@
         }
       };
 
-      // 🔥 스와이프 조작 동작
       let touchStartX = 0;
       let touchStartY = 0;
       window.addEventListener(
         'touchstart',
         (e) => {
-          if (e.target.closest('button')) return; // 버튼 클릭 시 제외
+          if (e.target.closest('button')) return;
           touchStartX = e.changedTouches[0].screenX;
           touchStartY = e.changedTouches[0].screenY;
         },
@@ -1355,7 +1395,7 @@
       window.addEventListener(
         'touchmove',
         (e) => {
-          if (gameState === 'PLAYING') e.preventDefault(); // 스와이프 시 화면 스크롤 방지
+          if (gameState === 'PLAYING') e.preventDefault();
         },
         { passive: false },
       );
@@ -1366,28 +1406,24 @@
         let touchEndY = e.changedTouches[0].screenY;
         const dx = touchEndX - touchStartX;
         const dy = touchEndY - touchStartY;
-
-        if (Math.abs(dx) < 30 && Math.abs(dy) < 30) return; // 살짝 터치한 건 무시
-
+        if (Math.abs(dx) < 30 && Math.abs(dy) < 30) return;
         startGameOnInput();
         if (Math.abs(dx) > Math.abs(dy)) {
           if (dx > 0) {
             player.nextDirX = 1;
             player.nextDirY = 0;
-          } // 오른쪽
-          else {
+          } else {
             player.nextDirX = -1;
             player.nextDirY = 0;
-          } // 왼쪽
+          }
         } else {
           if (dy > 0) {
             player.nextDirX = 0;
             player.nextDirY = 1;
-          } // 아래
-          else {
+          } else {
             player.nextDirX = 0;
             player.nextDirY = -1;
-          } // 위
+          }
         }
       });
 

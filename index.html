@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <title>진담중국어 짹맨</title>
+    <title>진담중국어 팡팡!</title>
     <script src="data.js"></script>
 
     <style>
@@ -25,39 +25,40 @@
         overscroll-behavior: none;
       }
 
+      /* 🔥 화면 흔들림(Shake) 효과 지진 수준으로 대폭 강화 (진폭 30px, 회전 5도) */
       @keyframes shake {
         0% {
-          transform: translate(5px, 5px) rotate(0deg);
+          transform: translate(10px, 10px) rotate(0deg);
         }
         10% {
-          transform: translate(-10px, -10px) rotate(-2deg);
+          transform: translate(-20px, -20px) rotate(-3deg);
         }
         20% {
-          transform: translate(-15px, 0px) rotate(3deg);
+          transform: translate(-30px, 0px) rotate(5deg);
         }
         30% {
-          transform: translate(15px, 10px) rotate(0deg);
+          transform: translate(30px, 20px) rotate(0deg);
         }
         40% {
-          transform: translate(5px, -5px) rotate(2deg);
+          transform: translate(10px, -10px) rotate(3deg);
         }
         50% {
-          transform: translate(-10px, 15px) rotate(-2deg);
+          transform: translate(-20px, 30px) rotate(-3deg);
         }
         60% {
-          transform: translate(-15px, 5px) rotate(0deg);
+          transform: translate(-30px, 10px) rotate(0deg);
         }
         70% {
-          transform: translate(15px, 5px) rotate(-3deg);
+          transform: translate(30px, 10px) rotate(-5deg);
         }
         80% {
-          transform: translate(-5px, -5px) rotate(2deg);
+          transform: translate(-10px, -10px) rotate(3deg);
         }
         90% {
-          transform: translate(10px, 15px) rotate(0deg);
+          transform: translate(20px, 30px) rotate(0deg);
         }
         100% {
-          transform: translate(5px, -10px) rotate(-2deg);
+          transform: translate(10px, -20px) rotate(-3deg);
         }
       }
       .shake-effect {
@@ -143,6 +144,29 @@
       }
       #timer-board {
         color: #00fff5;
+      }
+
+      #pause-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 40px;
+        height: 40px;
+        background: rgba(22, 33, 62, 0.8);
+        border: 2px solid #00fff5;
+        border-radius: 50%;
+        color: #00fff5;
+        font-size: 18px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 20;
+        pointer-events: auto;
+        box-shadow: 0 0 10px rgba(0, 255, 245, 0.3);
+      }
+      #pause-btn:active {
+        transform: scale(0.9);
       }
 
       #power-gauge {
@@ -390,7 +414,8 @@
         color: #aaa;
       }
 
-      #confirm-reset-modal {
+      #confirm-reset-modal,
+      #pause-modal {
         border-color: #e94560;
       }
 
@@ -429,7 +454,6 @@
         transform: scale(0.9);
       }
 
-      /* 스크롤바 디자인 */
       ::-webkit-scrollbar {
         width: 8px;
       }
@@ -466,17 +490,20 @@
         <div id="power-text">🐥 병아리 타임! 🐥</div>
       </div>
 
+      <div id="pause-btn" onclick="togglePause()">⏸️</div>
+
       <canvas id="gameCanvas"></canvas>
       <div id="status-msg">모드를 선택해주세요.</div>
       <div id="brand-logo">
-        <span class="brand-highlight">진담중국어</span> 짹맨
+        <span class="brand-highlight">진담중국어</span> 팩맨
       </div>
 
       <div id="ui-layer">
         <div id="main-menu-modal" class="modal">
           <h2 style="margin-top: 0">🎮 게임 모드 선택</h2>
           <button class="main-game-btn" onclick="startRankedGame()">
-            🔥 노말 모드<br /><span style="font-size: 12px; font-weight: normal"
+            🔥 본게임 시작<br /><span
+              style="font-size: 12px; font-weight: normal"
               >(모든 스테이지 연속 플레이 / 랭킹 도전)</span
             >
           </button>
@@ -503,7 +530,50 @@
         <div id="game-end-msg" class="modal"></div>
 
         <div id="rank-board-modal" class="modal">
-          <h2 class="rank-title">🏆 명예의 전당 🏆</h2>
+          <h2 class="rank-title" id="rank-title-text">🏆 명예의 전당 🏆</h2>
+          <div
+            style="
+              display: flex;
+              justify-content: center;
+              gap: 10px;
+              margin-bottom: 15px;
+            "
+          >
+            <button
+              id="tab-normal"
+              style="
+                padding: 8px 15px;
+                font-size: 14px;
+                font-weight: bold;
+                background: #00fff5;
+                color: #16213e;
+                border: 2px solid #00fff5;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: 0.2s;
+              "
+              onclick="showRankBoard(false)"
+            >
+              본게임
+            </button>
+            <button
+              id="tab-hell"
+              style="
+                padding: 8px 15px;
+                font-size: 14px;
+                font-weight: bold;
+                background: #16213e;
+                color: #e94560;
+                border: 2px solid #e94560;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: 0.2s;
+              "
+              onclick="showRankBoard(true)"
+            >
+              지옥모드
+            </button>
+          </div>
           <div class="rank-list rank-item rank-header">
             <span style="width: 15%">순위</span>
             <span style="width: 40%">이름</span>
@@ -523,8 +593,11 @@
 
         <div id="confirm-reset-modal" class="modal">
           <h2 style="color: #e94560; margin-top: 0">⚠️ 초기화 경고</h2>
-          <p style="font-size: 15px; margin-bottom: 20px">
-            정말 모든 랭킹 기록을 지우시겠습니까?<br /><span
+          <p
+            id="reset-confirm-msg"
+            style="font-size: 15px; margin-bottom: 20px"
+          >
+            정말 랭킹 기록을 지우시겠습니까?<br /><span
               style="font-size: 12px; color: #aaa"
               >(이 작업은 되돌릴 수 없습니다)</span
             >
@@ -535,6 +608,35 @@
             </button>
             <button class="btn-secondary" onclick="cancelResetRank()">
               아니오 (취소)
+            </button>
+          </div>
+        </div>
+
+        <div id="pause-modal" class="modal">
+          <h2 style="color: #00fff5; margin-top: 0">⏸️ 일시정지</h2>
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: 15px;
+              margin-top: 20px;
+            "
+          >
+            <button
+              class="main-game-btn"
+              style="margin-bottom: 0"
+              onclick="resumeGame()"
+            >
+              ▶️ 계속하기
+            </button>
+            <button
+              class="stage-select-btn"
+              onclick="
+                resumeGame();
+                resetToMainMenu();
+              "
+            >
+              🏠 메인 화면으로
             </button>
           </div>
         </div>
@@ -609,9 +711,11 @@
         if (playPromise !== undefined) playPromise.catch((error) => {});
       }
 
-      // 🔥 깜빡임 유발 속성(desynchronized) 제거
       const canvas = document.getElementById('gameCanvas');
-      const ctx = canvas.getContext('2d', { alpha: false });
+      const ctx = canvas.getContext('2d', {
+        alpha: false,
+        desynchronized: true,
+      });
       const TILE_SIZE = 30;
 
       let gameState = 'WAITING',
@@ -619,7 +723,8 @@
         stage = 1,
         gameStarted = false;
       let isRankedMode = false,
-        isHellMode = false;
+        isHellMode = false,
+        currentRankMode = false;
       let accumulatedTime = 0,
         lastTimestamp = 0,
         totalPellets = 0;
@@ -689,19 +794,14 @@
 
       function preDrawBackgrounds() {
         const palettes = [
-          { bg: '#16213e', border: '#0f3460' }, // 파랑
-          { bg: '#1e3b2b', border: '#0f2918' }, // 초록
-          { bg: '#2d1b36', border: '#1a0f20' }, // 보라
-          { bg: '#362b1b', border: '#20190f' }, // 주황
+          { bg: '#16213e', border: '#0f3460' },
+          { bg: '#1e3b2b', border: '#0f2918' },
+          { bg: '#2d1b36', border: '#1a0f20' },
+          { bg: '#362b1b', border: '#20190f' },
         ];
-
-        let p;
-        if (isHellMode) {
-          p = { bg: '#3a0b16', border: '#5c0000' };
-        } else {
-          let pIdx = (stage - 1) % palettes.length;
-          p = palettes[pIdx];
-        }
+        let p = isHellMode
+          ? { bg: '#3a0b16', border: '#5c0000' }
+          : palettes[(stage - 1) % palettes.length];
 
         bgCtx.fillStyle = '#0f3460';
         bgCtx.fillRect(0, 0, bgCache.width, bgCache.height);
@@ -718,7 +818,6 @@
               bgCtx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
               bgCtx.strokeStyle = p.border;
               bgCtx.strokeRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-
               penaltyCtx.fillStyle = '#3a0b16';
               penaltyCtx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
               penaltyCtx.strokeStyle = '#e94560';
@@ -750,11 +849,34 @@
         statusEl.style.color = color;
       }
 
+      function togglePause() {
+        if (gameState === 'PLAYING') {
+          gameState = 'PAUSED';
+          currentBgm.pause();
+          document.getElementById('pause-modal').style.display = 'block';
+          document.getElementById('pause-btn').style.display = 'none';
+        }
+      }
+
+      function resumeGame() {
+        if (gameState === 'PAUSED') {
+          gameState = 'PLAYING';
+          currentBgm.play().catch(() => {});
+          document.getElementById('pause-modal').style.display = 'none';
+          document.getElementById('pause-btn').style.display = 'flex';
+
+          clearTimeout(aiEventTimer);
+          aiEventTimer = setTimeout(triggerRandomAIEvent, 3000);
+        }
+      }
+
       function resetToMainMenu() {
         document.getElementById('game-end-msg').style.display = 'none';
         document.getElementById('rank-board-modal').style.display = 'none';
         document.getElementById('confirm-reset-modal').style.display = 'none';
         document.getElementById('quiz-modal').style.display = 'none';
+        document.getElementById('pause-modal').style.display = 'none';
+        document.getElementById('pause-btn').style.display = 'none';
         document.getElementById('main-menu-modal').style.display = 'block';
 
         document.getElementById('mode-board').textContent = 'READY';
@@ -786,11 +908,16 @@
       }
 
       function triggerRandomAIEvent() {
+        if (gameState === 'PAUSED') {
+          aiEventTimer = setTimeout(triggerRandomAIEvent, 1000);
+          return;
+        }
         if (gameState !== 'PLAYING') return;
         if (isPowerMode || isPenaltyMode) {
           aiEventTimer = setTimeout(triggerRandomAIEvent, 3000);
           return;
         }
+
         const patterns = ['STANDARD', 'STANDARD', 'RUSH', 'AMBUSH', 'SCATTER'];
         currentAIPattern =
           patterns[Math.floor(Math.random() * patterns.length)];
@@ -927,6 +1054,7 @@
               } else {
                 currentBgm.pause();
                 playSound(sfxQuiz);
+                document.getElementById('pause-btn').style.display = 'none';
                 updateScore();
                 triggerQuiz();
               }
@@ -1124,7 +1252,6 @@
       function generatePracticeButtons() {
         const container = document.getElementById('practice-btn-container');
         container.innerHTML = '';
-
         if (typeof quizStages !== 'undefined' && quizStages.length > 0) {
           for (let i = 0; i < quizStages.length; i++) {
             const btn = document.createElement('button');
@@ -1146,7 +1273,7 @@
         isHellMode = false;
         stage = 1;
         document.getElementById('main-menu-modal').style.display = 'none';
-        document.getElementById('mode-board').innerText = '🔥 노말 모드';
+        document.getElementById('mode-board').innerText = '🔥 본게임';
         document.getElementById('mode-board').style.color = '#e94560';
         score = 0;
         accumulatedTime = 0;
@@ -1186,7 +1313,6 @@
 
       function initStage() {
         map = initialMap.map((row) => [...row]);
-
         if (!isRankedMode) {
           map[3][4] = 3;
           map[3][14] = 3;
@@ -1227,6 +1353,7 @@
         clearTimeout(aiEventTimer);
         gameState = 'PLAYING';
         gameStarted = false;
+        document.getElementById('pause-btn').style.display = 'none';
 
         if (typeof quizStages !== 'undefined') {
           let stageIndex =
@@ -1266,6 +1393,7 @@
               gameArea.classList.add('catch-glow-effect');
             } else {
               clearTimeout(aiEventTimer);
+              document.getElementById('pause-btn').style.display = 'none';
               if (isRankedMode) showGameEndUI(false);
               else showPracticeEndUI(false);
               return;
@@ -1310,6 +1438,8 @@
       function checkAnswer(selectedIndex, correctIndex) {
         document.getElementById('quiz-modal').style.display = 'none';
         gameState = 'PLAYING';
+        document.getElementById('pause-btn').style.display = 'flex';
+
         if (selectedIndex === correctIndex) {
           playSound(sfxCorrect);
           score += 50;
@@ -1343,6 +1473,7 @@
       function checkWin() {
         if (totalPellets <= 0) {
           clearTimeout(aiEventTimer);
+          document.getElementById('pause-btn').style.display = 'none';
           if (isRankedMode) {
             if (stage >= quizStages.length) showGameEndUI(true);
             else showStageClearUI();
@@ -1431,8 +1562,10 @@
       function saveRank() {
         const name =
           document.getElementById('player-name').value.trim() || '무명';
-        let ranks =
-          JSON.parse(localStorage.getItem('chinesePacmanRanks')) || [];
+        const storageKey = isHellMode
+          ? 'chinesePacmanRanksHell'
+          : 'chinesePacmanRanks';
+        let ranks = JSON.parse(localStorage.getItem(storageKey)) || [];
         const displayStage = isHellMode ? 'HELL' : stage;
         ranks.push({
           name: name,
@@ -1441,17 +1574,37 @@
           stageInfo: displayStage,
         });
         ranks.sort((a, b) => b.score - a.score);
-        localStorage.setItem(
-          'chinesePacmanRanks',
-          JSON.stringify(ranks.slice(0, 5)),
-        );
-        showRankBoard();
+        localStorage.setItem(storageKey, JSON.stringify(ranks.slice(0, 5)));
+        showRankBoard(isHellMode);
       }
 
-      function showRankBoard() {
+      function showRankBoard(showHell = isHellMode) {
+        currentRankMode = showHell;
         document.getElementById('game-end-msg').style.display = 'none';
-        let ranks =
-          JSON.parse(localStorage.getItem('chinesePacmanRanks')) || [];
+        const tabNormal = document.getElementById('tab-normal'),
+          tabHell = document.getElementById('tab-hell'),
+          titleText = document.getElementById('rank-title-text');
+
+        if (showHell) {
+          tabNormal.style.background = '#16213e';
+          tabNormal.style.color = '#00fff5';
+          tabHell.style.background = '#e94560';
+          tabHell.style.color = 'white';
+          titleText.innerHTML = '😈 지옥 모드 랭킹 😈';
+          titleText.style.color = '#ff5e7e';
+        } else {
+          tabNormal.style.background = '#00fff5';
+          tabNormal.style.color = '#16213e';
+          tabHell.style.background = '#16213e';
+          tabHell.style.color = '#e94560';
+          titleText.innerHTML = '🏆 본게임 명예의 전당 🏆';
+          titleText.style.color = '#00fff5';
+        }
+
+        const storageKey = showHell
+          ? 'chinesePacmanRanksHell'
+          : 'chinesePacmanRanks';
+        let ranks = JSON.parse(localStorage.getItem(storageKey)) || [];
         const ul = document.getElementById('rank-list-ul');
         ul.innerHTML = '';
         if (ranks.length === 0) {
@@ -1473,6 +1626,8 @@
       }
 
       function showResetConfirm() {
+        document.getElementById('reset-confirm-msg').innerHTML =
+          `정말 <strong>${currentRankMode ? '지옥 모드' : '본게임'}</strong> 랭킹을 지우시겠습니까?<br /><span style="font-size: 12px; color: #aaa">(이 작업은 되돌릴 수 없습니다)</span>`;
         document.getElementById('rank-board-modal').style.display = 'none';
         document.getElementById('confirm-reset-modal').style.display = 'block';
       }
@@ -1481,9 +1636,12 @@
         document.getElementById('rank-board-modal').style.display = 'block';
       }
       function executeResetRank() {
-        localStorage.removeItem('chinesePacmanRanks');
+        const storageKey = currentRankMode
+          ? 'chinesePacmanRanksHell'
+          : 'chinesePacmanRanks';
+        localStorage.removeItem(storageKey);
         document.getElementById('confirm-reset-modal').style.display = 'none';
-        showRankBoard();
+        showRankBoard(currentRankMode);
       }
 
       function drawMap() {
@@ -1557,7 +1715,6 @@
           let effect = catchEffects[i];
           effect.y -= 40 * deltaTime;
           effect.life -= 1.5 * deltaTime;
-
           if (effect.life <= 0) {
             catchEffects.splice(i, 1);
           } else {
@@ -1587,11 +1744,18 @@
           gameStarted = true;
           showStatusMessage('', '');
           playSound(currentBgm);
+          document.getElementById('pause-btn').style.display = 'flex';
           aiEventTimer = setTimeout(triggerRandomAIEvent, 5000);
         }
       }
 
       window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (gameState === 'PLAYING') togglePause();
+          else if (gameState === 'PAUSED') resumeGame();
+          return;
+        }
+
         if (gameState !== 'PLAYING') return;
         if (
           [
@@ -1650,7 +1814,11 @@
       window.addEventListener(
         'touchstart',
         (e) => {
-          if (e.target.closest('.dpad-btn') || e.target.closest('button'))
+          if (
+            e.target.closest('.dpad-btn') ||
+            e.target.closest('button') ||
+            e.target.id === 'pause-btn'
+          )
             return;
           swipeStartX = e.touches[0].clientX;
           swipeStartY = e.touches[0].clientY;
@@ -1665,7 +1833,8 @@
             !swipeStartX ||
             !swipeStartY ||
             e.target.closest('.dpad-btn') ||
-            e.target.closest('button')
+            e.target.closest('button') ||
+            e.target.id === 'pause-btn'
           )
             return;
           let touchX = e.touches[0].clientX;

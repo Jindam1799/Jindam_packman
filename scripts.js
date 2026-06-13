@@ -1,0 +1,1203 @@
+const bgmNormal = new Audio('bgm.mp3');
+bgmNormal.loop = true;
+bgmNormal.volume = 0.4;
+const bgmHell = new Audio('hell.mp3');
+bgmHell.loop = true;
+bgmHell.volume = 0.4;
+let currentBgm = bgmNormal;
+
+const sfxEat = new Audio('eat.mp3');
+sfxEat.volume = 0.2;
+const sfxQuiz = new Audio('quiz.mp3');
+const sfxCorrect = new Audio('correct.mp3');
+const sfxWrong = new Audio('wrong.mp3');
+const sfxCatch = new Audio('catch.mp3');
+const sfxClear = new Audio('clear.mp3');
+const sfxOver = new Audio('gameover.mp3');
+
+let isAudioUnlocked = false;
+
+function unlockAudio() {
+  if (isAudioUnlocked) return;
+  [bgmNormal, bgmHell].forEach((audio) => {
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+        })
+        .catch(() => {});
+    }
+  });
+  isAudioUnlocked = true;
+}
+
+function playSound(audioObj) {
+  audioObj.currentTime = 0;
+  let playPromise = audioObj.play();
+  if (playPromise !== undefined) playPromise.catch((error) => {});
+}
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', {
+  alpha: false,
+  desynchronized: true,
+});
+const TILE_SIZE = 30;
+
+let gameState = 'WAITING',
+  score = 0,
+  stage = 1,
+  gameStarted = false;
+let isRankedMode = false,
+  isHellMode = false,
+  currentRankMode = false;
+let accumulatedTime = 0,
+  lastTimestamp = 0,
+  totalPellets = 0;
+let isPowerMode = false,
+  isPenaltyMode = false,
+  penaltyTimer = null;
+const POWER_DURATION = 8.0;
+let powerTimeLeft = 0;
+
+let availableQuestions = [],
+  currentAIPattern = 'STANDARD',
+  aiEventTimer = null;
+let lastTimerString = '',
+  activePellets = [],
+  catchEffects = [];
+
+const initialMap = [
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+  [1, 3, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 3, 1],
+  [1, 2, 1, 1, 2, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1],
+  [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+  [1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1],
+  [1, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 1],
+  [1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1],
+  [0, 0, 0, 0, 2, 1, 2, 2, 0, 0, 0, 2, 2, 1, 2, 0, 0, 0, 0],
+  [1, 1, 1, 1, 2, 1, 2, 1, 1, 4, 1, 1, 2, 1, 2, 1, 1, 1, 1],
+  [1, 2, 2, 2, 2, 2, 2, 1, 0, 0, 0, 1, 2, 2, 2, 2, 2, 2, 1],
+  [1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 1],
+  [1, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 2, 1],
+  [1, 1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1],
+  [1, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 1],
+  [1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1],
+  [1, 3, 2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2, 2, 2, 3, 1],
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+];
+
+let map = [];
+const ROWS = initialMap.length,
+  COLS = initialMap[0].length;
+canvas.width = COLS * TILE_SIZE;
+canvas.height = ROWS * TILE_SIZE;
+
+const bgCache = document.createElement('canvas');
+bgCache.width = canvas.width;
+bgCache.height = canvas.height;
+const bgCtx = bgCache.getContext('2d', { alpha: false });
+const penaltyCache = document.createElement('canvas');
+penaltyCache.width = canvas.width;
+penaltyCache.height = canvas.height;
+const penaltyCtx = penaltyCache.getContext('2d', { alpha: false });
+
+const emoCache = {};
+function createEmojiCache(emoji) {
+  const c = document.createElement('canvas');
+  c.width = 40;
+  c.height = 40;
+  const cx = c.getContext('2d');
+  cx.font = `26px serif`;
+  cx.textAlign = 'center';
+  cx.textBaseline = 'middle';
+  cx.fillText(emoji, 20, 20);
+  return c;
+}
+['💣', '👾', '🤖', '👹', '💀', '👻', '🐥'].forEach(
+  (e) => (emoCache[e] = createEmojiCache(e)),
+);
+
+function preDrawBackgrounds() {
+  const palettes = [
+    { bg: '#16213e', border: '#0f3460' },
+    { bg: '#1e3b2b', border: '#0f2918' },
+    { bg: '#2d1b36', border: '#1a0f20' },
+    { bg: '#362b1b', border: '#20190f' },
+  ];
+  let p = isHellMode
+    ? { bg: '#3a0b16', border: '#5c0000' }
+    : palettes[(stage - 1) % palettes.length];
+
+  bgCtx.fillStyle = '#0f3460';
+  bgCtx.fillRect(0, 0, bgCache.width, bgCache.height);
+  penaltyCtx.fillStyle = '#0f3460';
+  penaltyCtx.fillRect(0, 0, penaltyCache.width, penaltyCache.height);
+
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const tile = initialMap[y][x],
+        px = x * TILE_SIZE,
+        py = y * TILE_SIZE;
+      if (tile === 1) {
+        bgCtx.fillStyle = p.bg;
+        bgCtx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+        bgCtx.strokeStyle = p.border;
+        bgCtx.strokeRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        penaltyCtx.fillStyle = '#3a0b16';
+        penaltyCtx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+        penaltyCtx.strokeStyle = '#e94560';
+        penaltyCtx.strokeRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+      } else if (tile === 4) {
+        bgCtx.fillStyle = 'rgba(233, 69, 96, 0.3)';
+        bgCtx.fillRect(px, py + TILE_SIZE / 2 - 2, TILE_SIZE, 4);
+        penaltyCtx.fillStyle = 'rgba(233, 69, 96, 0.3)';
+        penaltyCtx.fillRect(px, py + TILE_SIZE / 2 - 2, TILE_SIZE, 4);
+      }
+    }
+  }
+}
+
+function getPixelX(gridX) {
+  return gridX * TILE_SIZE + TILE_SIZE / 2;
+}
+function getPixelY(gridY) {
+  return gridY * TILE_SIZE + TILE_SIZE / 2;
+}
+function showStatusMessage(msg, color) {
+  const statusEl = document.getElementById('status-msg');
+  statusEl.textContent = msg;
+  statusEl.style.color = color;
+}
+
+function togglePause() {
+  if (gameState === 'PLAYING') {
+    gameState = 'PAUSED';
+    currentBgm.pause();
+    document.getElementById('pause-modal').style.display = 'block';
+    document.getElementById('pause-btn').style.display = 'none';
+  }
+}
+
+function resumeGame() {
+  if (gameState === 'PAUSED') {
+    gameState = 'PLAYING';
+    currentBgm.play().catch(() => {});
+    document.getElementById('pause-modal').style.display = 'none';
+    document.getElementById('pause-btn').style.display = 'flex';
+
+    clearTimeout(aiEventTimer);
+    aiEventTimer = setTimeout(triggerRandomAIEvent, 3000);
+  }
+}
+
+function resetToMainMenu() {
+  document.getElementById('game-end-msg').style.display = 'none';
+  document.getElementById('rank-board-modal').style.display = 'none';
+  document.getElementById('confirm-reset-modal').style.display = 'none';
+  document.getElementById('quiz-modal').style.display = 'none';
+  document.getElementById('pause-modal').style.display = 'none';
+  document.getElementById('pause-btn').style.display = 'none';
+  document.getElementById('main-menu-modal').style.display = 'block';
+
+  document.getElementById('mode-board').textContent = 'READY';
+  document.getElementById('mode-board').style.color = '#FFD700';
+  document.getElementById('score-board').textContent = 'SCORE: 0';
+  document.getElementById('timer-board').textContent = 'TIME: 0.0s';
+
+  showStatusMessage('모드를 선택해주세요.', '#FFD700');
+  document.getElementById('power-gauge').style.display = 'none';
+
+  clearTimeout(aiEventTimer);
+  clearTimeout(penaltyTimer);
+  currentBgm.pause();
+  currentBgm.currentTime = 0;
+
+  gameState = 'WAITING';
+  gameStarted = false;
+  isPowerMode = false;
+  isPenaltyMode = false;
+  isHellMode = false;
+  isRankedMode = false;
+  stage = 1;
+
+  preDrawBackgrounds();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bgCache, 0, 0);
+  player.reset(9, 15);
+  player.draw();
+}
+
+function triggerRandomAIEvent() {
+  if (gameState === 'PAUSED') {
+    aiEventTimer = setTimeout(triggerRandomAIEvent, 1000);
+    return;
+  }
+  if (gameState !== 'PLAYING') return;
+  if (isPowerMode || isPenaltyMode) {
+    aiEventTimer = setTimeout(triggerRandomAIEvent, 3000);
+    return;
+  }
+
+  const patterns = ['STANDARD', 'STANDARD', 'RUSH', 'AMBUSH', 'SCATTER'];
+  currentAIPattern = patterns[Math.floor(Math.random() * patterns.length)];
+
+  if (currentAIPattern === 'RUSH')
+    showStatusMessage('🚨 적들의 합동 돌진! 거리를 좁혀옵니다!', '#ff5e7e');
+  else if (currentAIPattern === 'AMBUSH')
+    showStatusMessage('⚠️ 적들이 포위망을 형성합니다!', '#FFD700');
+  else if (currentAIPattern === 'SCATTER')
+    showStatusMessage('💨 적들이 잠시 흩어집니다!', '#00fff5');
+  else showStatusMessage('게임을 계속 진행하세요.', 'white');
+
+  clearTimeout(aiEventTimer);
+  aiEventTimer = setTimeout(triggerRandomAIEvent, Math.random() * 3000 + 5000);
+}
+
+class Pacman {
+  constructor() {
+    this.speed = 3.5;
+    this.radius = TILE_SIZE * 0.4;
+    this.mouthSpeed = 0.2;
+    this.reset(9, 15);
+  }
+  reset(startX, startY) {
+    this.gridX = startX;
+    this.gridY = startY;
+    this.px = getPixelX(startX);
+    this.py = getPixelY(startY);
+    this.dirX = 0;
+    this.dirY = 0;
+    this.nextDirX = 0;
+    this.nextDirY = 0;
+    this.mouthOpen = 0;
+    this.angle = 0;
+  }
+  draw() {
+    if (this.dirX !== 0 || this.dirY !== 0) {
+      this.mouthOpen += this.mouthSpeed;
+      if (this.mouthOpen > 0.2 * Math.PI || this.mouthOpen <= 0)
+        this.mouthSpeed = -this.mouthSpeed;
+    } else {
+      this.mouthOpen = 0.1 * Math.PI;
+    }
+
+    ctx.save();
+    ctx.translate(this.px | 0, this.py | 0);
+    ctx.rotate(this.angle);
+    ctx.beginPath();
+    if (isPowerMode) ctx.fillStyle = '#FFD700';
+    else if (isPenaltyMode) ctx.fillStyle = '#ffb8ae';
+    else ctx.fillStyle = '#00fff5';
+    ctx.arc(0, 0, this.radius, this.mouthOpen, 2 * Math.PI - this.mouthOpen);
+    ctx.lineTo(0, 0);
+    ctx.fill();
+    ctx.closePath();
+    ctx.restore();
+  }
+  update() {
+    if (gameState !== 'PLAYING' || !gameStarted) return;
+    const centerX = getPixelX(this.gridX),
+      centerY = getPixelY(this.gridY);
+    if (
+      Math.abs(this.px - centerX) <= this.speed &&
+      Math.abs(this.py - centerY) <= this.speed
+    ) {
+      this.px = centerX;
+      this.py = centerY;
+      if (this.nextDirX !== 0 || this.nextDirY !== 0) {
+        let nextX = (this.gridX + this.nextDirX + COLS) % COLS,
+          nextY = this.gridY + this.nextDirY;
+        if (map[nextY] && map[nextY][nextX] !== 1 && map[nextY][nextX] !== 4) {
+          this.dirX = this.nextDirX;
+          this.dirY = this.nextDirY;
+          if (this.dirX === 1) this.angle = 0;
+          else if (this.dirX === -1) this.angle = Math.PI;
+          else if (this.dirY === 1) this.angle = Math.PI / 2;
+          else if (this.dirY === -1) this.angle = -Math.PI / 2;
+        }
+      }
+      let frontX = (this.gridX + this.dirX + COLS) % COLS,
+        frontY = this.gridY + this.dirY;
+      if (
+        map[frontY] &&
+        (map[frontY][frontX] === 1 || map[frontY][frontX] === 4)
+      ) {
+        this.dirX = 0;
+        this.dirY = 0;
+      } else {
+        this.gridX = frontX;
+        this.gridY = frontY;
+      }
+    }
+    this.px += this.dirX * this.speed;
+    this.py += this.dirY * this.speed;
+    if (this.px < 0) {
+      this.px += canvas.width;
+      this.gridX = COLS - 1;
+    } else if (this.px >= canvas.width) {
+      this.px -= canvas.width;
+      this.gridX = 0;
+    }
+
+    if (map[this.gridY] && map[this.gridY][this.gridX]) {
+      const tile = map[this.gridY][this.gridX];
+      if (tile === 2 || tile === 3) {
+        map[this.gridY][this.gridX] = 0;
+        totalPellets--;
+        let idx = activePellets.findIndex(
+          (p) => p.x === this.gridX && p.y === this.gridY,
+        );
+        if (idx !== -1) activePellets.splice(idx, 1);
+
+        if (tile === 2) {
+          score += 10;
+          playSound(sfxEat);
+          updateScore();
+          checkWin();
+        } else {
+          currentBgm.pause();
+          playSound(sfxQuiz);
+          document.getElementById('pause-btn').style.display = 'none';
+          updateScore();
+          triggerQuiz();
+        }
+      }
+    }
+  }
+}
+
+const GHOST_DIRS = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+];
+
+class Ghost {
+  constructor(emoji, id, initialBaseSpeed) {
+    this.emoji = emoji;
+    this.id = id;
+    this.initialBaseSpeed = initialBaseSpeed;
+    this.baseSpeed = initialBaseSpeed;
+    this.speed = this.baseSpeed;
+  }
+  reset(startX, startY) {
+    this.startX = startX;
+    this.startY = startY;
+    this.gridX = startX;
+    this.gridY = startY;
+    this.px = getPixelX(startX);
+    this.py = getPixelY(startY);
+    this.dirX = 1;
+    this.dirY = 0;
+    const stageMultiplier = isRankedMode ? stage - 1 : 0;
+    this.baseSpeed = this.initialBaseSpeed + stageMultiplier * 0.3;
+    this.speed = this.baseSpeed;
+  }
+  draw() {
+    ctx.save();
+    ctx.translate(this.px | 0, this.py | 0);
+    if (isPowerMode) {
+      if (powerTimeLeft <= 2.5 && Math.floor(powerTimeLeft * 5) % 2 === 0)
+        ctx.globalAlpha = 0.3;
+      ctx.drawImage(emoCache['🐥'], -20, -20);
+      ctx.globalAlpha = 1.0;
+    } else {
+      ctx.drawImage(emoCache[this.emoji], -20, -20);
+    }
+    ctx.restore();
+  }
+  getTarget() {
+    if (this.gridY === 9 && this.gridX >= 8 && this.gridX <= 10)
+      return { x: 9, y: 7 };
+    if (isPowerMode || isPenaltyMode || this.id === 0)
+      return { x: player.gridX, y: player.gridY };
+    if (currentAIPattern === 'RUSH') {
+      return { x: player.gridX, y: player.gridY };
+    } else if (currentAIPattern === 'AMBUSH') {
+      const offsets = [
+        { x: 0, y: -3 },
+        { x: 0, y: 3 },
+        { x: -3, y: 0 },
+        { x: 3, y: 0 },
+        { x: -2, y: -2 },
+        { x: 2, y: 2 },
+      ];
+      return {
+        x: player.gridX + offsets[this.id].x,
+        y: player.gridY + offsets[this.id].y,
+      };
+    } else if (currentAIPattern === 'SCATTER') {
+      const corners = [
+        { x: 1, y: 1 },
+        { x: COLS - 2, y: 1 },
+        { x: 1, y: ROWS - 2 },
+        { x: COLS - 2, y: ROWS - 2 },
+        { x: (COLS / 2) | 0, y: 1 },
+        { x: (COLS / 2) | 0, y: ROWS - 2 },
+      ];
+      return corners[this.id];
+    }
+    if (this.id === 1)
+      return {
+        x: player.gridX + player.dirX * 3,
+        y: player.gridY + player.dirY * 3,
+      };
+    if (this.id === 2)
+      return {
+        x: player.gridX - player.dirX * 2,
+        y: player.gridY - player.dirY * 2,
+      };
+    if (this.id === 4)
+      return {
+        x: player.gridX + player.dirX * 2,
+        y: player.gridY + player.dirY * 2,
+      };
+    if (this.id === 5)
+      return {
+        x: player.gridX - player.dirX * 3,
+        y: player.gridY - player.dirY * 3,
+      };
+
+    if (this.id === 3) {
+      const dist =
+        Math.abs(this.gridX - player.gridX) +
+        Math.abs(this.gridY - player.gridY);
+      if (dist < 6) return { x: 1, y: 1 };
+      return { x: player.gridX, y: player.gridY };
+    }
+    return { x: player.gridX, y: player.gridY };
+  }
+  update() {
+    if (gameState !== 'PLAYING' || !gameStarted) return;
+    const centerX = getPixelX(this.gridX),
+      centerY = getPixelY(this.gridY);
+    if (
+      Math.abs(this.px - centerX) <= this.speed &&
+      Math.abs(this.py - centerY) <= this.speed
+    ) {
+      this.px = centerX;
+      this.py = centerY;
+      const target = this.getTarget();
+      let minScore = Infinity,
+        bestDir = null,
+        fallbackDir = null,
+        validCount = 0;
+      for (let i = 0; i < 4; i++) {
+        const d = GHOST_DIRS[i];
+        if (d[0] === -this.dirX && d[1] === -this.dirY) continue;
+        const nextX = (this.gridX + d[0] + COLS) % COLS,
+          nextY = this.gridY + d[1];
+        if (nextY >= 0 && nextY < ROWS && map[nextY][nextX] !== 1) {
+          validCount++;
+          fallbackDir = d;
+          let distScore =
+            Math.abs(nextX - target.x) + Math.abs(nextY - target.y);
+          if (isPowerMode) distScore = -distScore;
+          let penalty = 0;
+          if (currentAIPattern !== 'RUSH') {
+            for (let g = 0; g < activeGhosts.length; g++) {
+              if (activeGhosts[g].id !== this.id) {
+                if (
+                  Math.abs(nextX - activeGhosts[g].gridX) +
+                    Math.abs(nextY - activeGhosts[g].gridY) ===
+                  0
+                )
+                  penalty += 15;
+              }
+            }
+          }
+          let finalScore = distScore + penalty;
+          if (finalScore < minScore) {
+            minScore = finalScore;
+            bestDir = d;
+          }
+        }
+      }
+      if (validCount > 0) {
+        if (!isPowerMode && !isPenaltyMode && Math.random() < 0.1) {
+          this.dirX = fallbackDir[0];
+          this.dirY = fallbackDir[1];
+        } else {
+          this.dirX = bestDir[0];
+          this.dirY = bestDir[1];
+        }
+      } else {
+        this.dirX *= -1;
+        this.dirY *= -1;
+      }
+      this.gridX = (this.gridX + this.dirX + COLS) % COLS;
+      this.gridY += this.dirY;
+    }
+    this.px += this.dirX * this.speed;
+    this.py += this.dirY * this.speed;
+    if (this.px < 0) {
+      this.px += canvas.width;
+      this.gridX = COLS - 1;
+    } else if (this.px >= canvas.width) {
+      this.px -= canvas.width;
+      this.gridX = 0;
+    }
+  }
+}
+
+const player = new Pacman();
+const allGhosts = [
+  new Ghost('💣', 0, 2.6),
+  new Ghost('👾', 1, 2.4),
+  new Ghost('🤖', 2, 2.5),
+  new Ghost('👹', 3, 2.3),
+  new Ghost('💀', 4, 2.7),
+  new Ghost('👻', 5, 2.2),
+];
+let activeGhosts = [];
+
+function generatePracticeButtons() {
+  const container = document.getElementById('practice-btn-container');
+  container.innerHTML = '';
+  if (typeof quizStages !== 'undefined' && quizStages.length > 0) {
+    for (let i = 0; i < quizStages.length; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'stage-select-btn';
+      btn.onclick = () => startPractice(i + 1);
+      btn.textContent = `St.${i + 1} 연습`;
+      container.appendChild(btn);
+    }
+  } else {
+    container.innerHTML = '<span style="color:#aaa;">데이터가 없습니다.</span>';
+  }
+}
+
+function startRankedGame() {
+  currentBgm = bgmNormal;
+  unlockAudio();
+  isRankedMode = true;
+  isHellMode = false;
+  stage = 1;
+  document.getElementById('main-menu-modal').style.display = 'none';
+  document.getElementById('mode-board').innerText = '🔥 본게임';
+  document.getElementById('mode-board').style.color = '#e94560';
+  score = 0;
+  accumulatedTime = 0;
+  updateScore();
+  initStage();
+}
+
+function startHellMode() {
+  currentBgm = bgmHell;
+  unlockAudio();
+  isRankedMode = true;
+  isHellMode = true;
+  stage = 1;
+  document.getElementById('main-menu-modal').style.display = 'none';
+  document.getElementById('mode-board').innerText = '😈 지옥 모드';
+  document.getElementById('mode-board').style.color = '#ff5e7e';
+  score = 0;
+  accumulatedTime = 0;
+  updateScore();
+  initStage();
+}
+
+function startPractice(num) {
+  currentBgm = bgmNormal;
+  unlockAudio();
+  isRankedMode = false;
+  isHellMode = false;
+  stage = num;
+  document.getElementById('main-menu-modal').style.display = 'none';
+  document.getElementById('mode-board').innerText = `연습: St.${stage}`;
+  document.getElementById('mode-board').style.color = '#00fff5';
+  score = 0;
+  accumulatedTime = 0;
+  updateScore();
+  initStage();
+}
+
+function initStage() {
+  map = initialMap.map((row) => [...row]);
+  if (!isRankedMode) {
+    map[3][4] = 3;
+    map[3][14] = 3;
+    map[13][4] = 3;
+    map[13][14] = 3;
+  }
+
+  preDrawBackgrounds();
+
+  totalPellets = 0;
+  activePellets = [];
+  catchEffects = [];
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (map[y][x] === 2 || map[y][x] === 3) {
+        totalPellets++;
+        activePellets.push({ x: x, y: y, type: map[y][x] });
+      }
+    }
+  }
+
+  player.reset(9, 15);
+  activeGhosts = isHellMode ? allGhosts : allGhosts.slice(0, 4);
+  activeGhosts[0].reset(9, 7);
+  activeGhosts[1].reset(8, 9);
+  activeGhosts[2].reset(9, 9);
+  activeGhosts[3].reset(10, 9);
+  if (isHellMode) {
+    activeGhosts[4].reset(8, 7);
+    activeGhosts[5].reset(10, 7);
+  }
+
+  isPowerMode = false;
+  isPenaltyMode = false;
+  document.getElementById('power-gauge').style.display = 'none';
+  clearTimeout(penaltyTimer);
+  currentAIPattern = 'STANDARD';
+  clearTimeout(aiEventTimer);
+  gameState = 'PLAYING';
+  gameStarted = false;
+  document.getElementById('pause-btn').style.display = 'none';
+
+  if (typeof quizStages !== 'undefined') {
+    let stageIndex =
+      stage - 1 < quizStages.length ? stage - 1 : quizStages.length - 1;
+    availableQuestions = [...quizStages[stageIndex]];
+  } else {
+    availableQuestions = [];
+  }
+  showStatusMessage(`방향키나 터치로 출발하세요!`, 'white');
+}
+
+function checkCollisions() {
+  if (!gameStarted) return;
+  for (let ghost of activeGhosts) {
+    if (
+      Math.sqrt(
+        Math.pow(player.px - ghost.px, 2) + Math.pow(player.py - ghost.py, 2),
+      ) <
+      TILE_SIZE * 0.7
+    ) {
+      if (isPowerMode) {
+        catchEffects.push({
+          x: ghost.px,
+          y: ghost.py,
+          text: '+200',
+          life: 1.0,
+        });
+        ghost.reset(9, 9);
+        score += 200;
+        playSound(sfxCatch);
+        updateScore();
+
+        const gameArea = document.getElementById('game-area');
+        gameArea.classList.remove('catch-glow-effect');
+        void gameArea.offsetWidth;
+        gameArea.classList.add('catch-glow-effect');
+      } else {
+        clearTimeout(aiEventTimer);
+        document.getElementById('pause-btn').style.display = 'none';
+        if (isRankedMode) showGameEndUI(false);
+        else showPracticeEndUI(false);
+        return;
+      }
+    }
+  }
+}
+
+function triggerQuiz() {
+  gameState = 'QUIZ';
+  const modal = document.getElementById('quiz-modal'),
+    kText = document.getElementById('korean-text'),
+    optionsContainer = document.getElementById('options-container');
+  if (availableQuestions.length === 0) {
+    let stageIndex =
+      stage - 1 < quizStages.length ? stage - 1 : quizStages.length - 1;
+    availableQuestions = [...quizStages[stageIndex]];
+  }
+  const randomIndex = Math.floor(Math.random() * availableQuestions.length);
+  const randomQuiz = availableQuestions[randomIndex];
+  availableQuestions.splice(randomIndex, 1);
+  kText.innerText = randomQuiz.korean;
+  optionsContainer.innerHTML = '';
+  let options = [randomQuiz.correct, ...randomQuiz.wrong];
+  for (let i = options.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [options[i], options[j]] = [options[j], options[i]];
+  }
+  const correctIndex = options.indexOf(randomQuiz.correct);
+  options.forEach((opt, index) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.innerHTML = `<span style="color:#00fff5; margin-right:10px; font-weight:bold;">[${index + 1}]</span> ${opt}`;
+    btn.onclick = () => checkAnswer(index, correctIndex);
+    optionsContainer.appendChild(btn);
+  });
+  modal.style.display = 'block';
+}
+
+function checkAnswer(selectedIndex, correctIndex) {
+  document.getElementById('quiz-modal').style.display = 'none';
+  gameState = 'PLAYING';
+  document.getElementById('pause-btn').style.display = 'flex';
+
+  if (selectedIndex === correctIndex) {
+    playSound(sfxCorrect);
+    score += 50;
+    updateScore();
+    showStatusMessage('정답! 🐥 병아리를 잡으세요! (점수 +200)', '#00FF00');
+    activatePowerMode();
+  } else {
+    playSound(sfxWrong);
+    score = Math.max(0, score - 100);
+    updateScore();
+    showStatusMessage(
+      '🚨 오답! 적들의 속도가 빨라집니다! (점수 -100)',
+      '#e94560',
+    );
+    const gameArea = document.getElementById('game-area');
+    gameArea.classList.add('shake-effect');
+    setTimeout(() => {
+      gameArea.classList.remove('shake-effect');
+    }, 500);
+    activatePenaltyMode();
+  }
+
+  let playPromise = currentBgm.play();
+  if (playPromise !== undefined) playPromise.catch((error) => {});
+  checkWin();
+}
+
+function checkWin() {
+  if (totalPellets <= 0) {
+    clearTimeout(aiEventTimer);
+    document.getElementById('pause-btn').style.display = 'none';
+    if (isRankedMode) {
+      if (stage >= quizStages.length) showGameEndUI(true);
+      else showStageClearUI();
+    } else {
+      showPracticeEndUI(true);
+    }
+  }
+}
+
+function showStageClearUI() {
+  gameState = 'STAGE_CLEAR';
+  currentBgm.pause();
+  playSound(sfxClear);
+  const endMsgEl = document.getElementById('game-end-msg');
+  score += 1000;
+  updateScore();
+  endMsgEl.innerHTML = `<div class="title" style="color: #FFD700;">STAGE ${stage} CLEAR!</div><div class="stats">보너스 점수 +1000점!</div><button class="btn-primary" onclick="nextStage()" style="margin-top:20px; width:100%;">다음 스테이지 도전</button>`;
+  endMsgEl.style.display = 'block';
+}
+function nextStage() {
+  document.getElementById('game-end-msg').style.display = 'none';
+  stage++;
+  initStage();
+}
+
+function showGameEndUI(isClear) {
+  gameState = 'GAME_END';
+  currentBgm.pause();
+  playSound(isClear ? sfxClear : sfxOver);
+  const endMsgEl = document.getElementById('game-end-msg');
+  if (isClear) score += 3000;
+  const titleText = isClear ? '🎉 MISSION COMPLETE! 🎉' : 'GAME OVER';
+  endMsgEl.innerHTML = `
+    <div class="title" style="color: ${isClear ? '#FFD700' : '#e94560'}; font-size: 32px;">${titleText}</div>
+    <div class="stats" style="color:white;">최종 점수: ${score}점</div>
+    <div class="stats" style="font-size:16px;">진행 시간: ${accumulatedTime.toFixed(1)}초 (도달: Stage ${stage})</div>
+    <input type="text" id="player-name" maxlength="5" placeholder="이름 입력" autocomplete="off">
+    <div class="btn-group">
+      <button class="btn-primary" onclick="saveRank()">랭킹 등록</button>
+      <button class="btn-secondary" onclick="resetToMainMenu()">메인으로</button>
+    </div>
+  `;
+  endMsgEl.style.display = 'block';
+}
+
+function showPracticeEndUI(isClear) {
+  gameState = 'GAME_END';
+  currentBgm.pause();
+  playSound(isClear ? sfxClear : sfxOver);
+  const endMsgEl = document.getElementById('game-end-msg');
+  const titleText = isClear ? '🎉 연습 완료! 🎉' : '연습 종료';
+  endMsgEl.innerHTML = `
+    <div class="title" style="color: ${isClear ? '#FFD700' : '#e94560'}; font-size: 32px;">${titleText}</div>
+    <div class="stats" style="font-size:16px; color:#aaa; margin-bottom:15px;">연습 모드는 랭킹에 기록되지 않습니다.</div>
+    <div class="stats" style="color:white;">획득 점수: ${score}점</div>
+    <div class="stats" style="font-size:16px;">연습 시간: ${accumulatedTime.toFixed(1)}초</div>
+    <button class="btn-primary" onclick="resetToMainMenu()" style="margin-top:20px; width:100%;">메인 화면으로</button>
+  `;
+  endMsgEl.style.display = 'block';
+  endMsgEl.style.borderColor = isClear ? '#FFD700' : '#e94560';
+}
+
+function activatePowerMode() {
+  isPowerMode = true;
+  isPenaltyMode = false;
+  clearTimeout(penaltyTimer);
+  activeGhosts.forEach((g) => (g.speed = 1.5));
+  powerTimeLeft = POWER_DURATION;
+  document.getElementById('power-gauge').style.display = 'block';
+}
+function activatePenaltyMode() {
+  isPenaltyMode = true;
+  isPowerMode = false;
+  clearTimeout(penaltyTimer);
+  activeGhosts.forEach((g) => (g.speed = g.baseSpeed + 1.2));
+  penaltyTimer = setTimeout(() => {
+    isPenaltyMode = false;
+    activeGhosts.forEach((g) => (g.speed = g.baseSpeed));
+    showStatusMessage('게임을 계속 진행하세요.', 'white');
+  }, 5000);
+}
+function updateScore() {
+  document.getElementById('score-board').textContent = 'SCORE: ' + score;
+}
+
+function saveRank() {
+  const name = document.getElementById('player-name').value.trim() || '무명';
+  const storageKey = isHellMode
+    ? 'chinesePacmanRanksHell'
+    : 'chinesePacmanRanks';
+  let ranks = JSON.parse(localStorage.getItem(storageKey)) || [];
+  const displayStage = isHellMode ? 'HELL' : stage;
+  ranks.push({
+    name: name,
+    score: score,
+    time: accumulatedTime.toFixed(1),
+    stageInfo: displayStage,
+  });
+  ranks.sort((a, b) => b.score - a.score);
+  localStorage.setItem(storageKey, JSON.stringify(ranks.slice(0, 5)));
+  showRankBoard(isHellMode);
+}
+
+function showRankBoard(showHell = isHellMode) {
+  currentRankMode = showHell;
+  document.getElementById('game-end-msg').style.display = 'none';
+  const tabNormal = document.getElementById('tab-normal'),
+    tabHell = document.getElementById('tab-hell'),
+    titleText = document.getElementById('rank-title-text');
+
+  if (showHell) {
+    tabNormal.style.background = '#16213e';
+    tabNormal.style.color = '#00fff5';
+    tabHell.style.background = '#e94560';
+    tabHell.style.color = 'white';
+    titleText.innerHTML = '😈 지옥 모드 랭킹 😈';
+    titleText.style.color = '#ff5e7e';
+  } else {
+    tabNormal.style.background = '#00fff5';
+    tabNormal.style.color = '#16213e';
+    tabHell.style.background = '#16213e';
+    tabHell.style.color = '#e94560';
+    titleText.innerHTML = '🏆 본게임 명예의 전당 🏆';
+    titleText.style.color = '#00fff5';
+  }
+
+  const storageKey = showHell ? 'chinesePacmanRanksHell' : 'chinesePacmanRanks';
+  let ranks = JSON.parse(localStorage.getItem(storageKey)) || [];
+  const ul = document.getElementById('rank-list-ul');
+  ul.innerHTML = '';
+  if (ranks.length === 0) {
+    ul.innerHTML =
+      '<li class="rank-item" style="justify-content:center;">기록이 없습니다.</li>';
+  } else {
+    ranks.forEach((r, i) => {
+      const displayStage =
+        r.stageInfo !== undefined ? r.stageInfo : r.stage || 1;
+      const stText = displayStage === 'HELL' ? 'HELL' : `St.${displayStage}`;
+      const li = document.createElement('li');
+      li.className = 'rank-item';
+      li.innerHTML = `<span style="width: 20%;">${i + 1}</span><span style="width: 35%; overflow:hidden;">${r.name}</span><span style="width: 20%; color:#FFD700;">${r.score}</span><span style="width: 25%; text-align:right; font-size:14px; color:#00fff5; line-height: 1.2;">${r.time}s<br><span style="font-size:11px; color:#aaa;">(${stText})</span></span>`;
+      ul.appendChild(li);
+    });
+  }
+  document.getElementById('rank-board-modal').style.display = 'block';
+}
+
+function showResetConfirm() {
+  document.getElementById('reset-confirm-msg').innerHTML =
+    `정말 <strong>${currentRankMode ? '지옥 모드' : '본게임'}</strong> 랭킹을 지우시겠습니까?<br /><span style="font-size: 12px; color: #aaa">(이 작업은 되돌릴 수 없습니다)</span>`;
+  document.getElementById('rank-board-modal').style.display = 'none';
+  document.getElementById('confirm-reset-modal').style.display = 'block';
+}
+function cancelResetRank() {
+  document.getElementById('confirm-reset-modal').style.display = 'none';
+  document.getElementById('rank-board-modal').style.display = 'block';
+}
+function executeResetRank() {
+  const storageKey = currentRankMode
+    ? 'chinesePacmanRanksHell'
+    : 'chinesePacmanRanks';
+  localStorage.removeItem(storageKey);
+  document.getElementById('confirm-reset-modal').style.display = 'none';
+  showRankBoard(currentRankMode);
+}
+
+function drawMap() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (isPenaltyMode) {
+    ctx.drawImage(penaltyCache, 0, 0);
+  } else {
+    ctx.drawImage(bgCache, 0, 0);
+  }
+
+  // 일반 펠릿 (작은 하얀색 원)
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  for (let i = 0; i < activePellets.length; i++) {
+    if (activePellets[i].type === 2) {
+      const px = activePellets[i].x * TILE_SIZE + 15;
+      const py = activePellets[i].y * TILE_SIZE + 15;
+      ctx.moveTo(px + 2, py);
+      ctx.arc(px, py, 2, 0, Math.PI * 2);
+    }
+  }
+  ctx.fill();
+
+  // 🔥 보너스 펠릿 (황금색 별 모양)
+  ctx.fillStyle = '#FFD700'; // 황금색
+  ctx.beginPath();
+  for (let i = 0; i < activePellets.length; i++) {
+    if (activePellets[i].type === 3) {
+      const cx = activePellets[i].x * TILE_SIZE + 15;
+      const cy = activePellets[i].y * TILE_SIZE + 15;
+      const spikes = 5;
+      const outerRadius = 10; // 별의 뾰족한 끝부분
+      const innerRadius = 4; // 별의 안쪽 오목한 부분
+      let rot = (Math.PI / 2) * 3;
+      let step = Math.PI / spikes;
+
+      ctx.moveTo(cx, cy - outerRadius);
+      for (let j = 0; j < spikes; j++) {
+        let x = cx + Math.cos(rot) * outerRadius;
+        let y = cy + Math.sin(rot) * outerRadius;
+        ctx.lineTo(x, y);
+        rot += step;
+
+        x = cx + Math.cos(rot) * innerRadius;
+        y = cy + Math.sin(rot) * innerRadius;
+        ctx.lineTo(x, y);
+        rot += step;
+      }
+      ctx.lineTo(cx, cy - outerRadius);
+    }
+  }
+  ctx.fill();
+}
+
+function gameLoop(timestamp) {
+  if (!lastTimestamp) lastTimestamp = timestamp;
+  let deltaTime = (timestamp - lastTimestamp) / 1000;
+  if (deltaTime > 0.1) deltaTime = 0.1;
+  lastTimestamp = timestamp;
+
+  if (gameState === 'PLAYING' && gameStarted) {
+    accumulatedTime += deltaTime;
+    let newTimerString = 'TIME: ' + accumulatedTime.toFixed(1) + 's';
+    if (lastTimerString !== newTimerString) {
+      document.getElementById('timer-board').textContent = newTimerString;
+      lastTimerString = newTimerString;
+    }
+
+    if (isPowerMode) {
+      powerTimeLeft -= deltaTime;
+      const fillEl = document.getElementById('power-fill');
+      fillEl.style.width =
+        Math.max(0, (powerTimeLeft / POWER_DURATION) * 100) + '%';
+      if (powerTimeLeft <= 2.5)
+        fillEl.style.backgroundColor =
+          Math.floor(powerTimeLeft * 10) % 2 === 0 ? '#fff' : '#FFD700';
+      else fillEl.style.backgroundColor = '#FFD700';
+      if (powerTimeLeft <= 0) {
+        isPowerMode = false;
+        activeGhosts.forEach((g) => (g.speed = g.baseSpeed));
+        document.getElementById('power-gauge').style.display = 'none';
+        showStatusMessage('게임을 계속 진행하세요.', 'white');
+      }
+    }
+  }
+
+  drawMap();
+  activeGhosts.forEach((g) => g.draw());
+  player.draw();
+
+  for (let i = catchEffects.length - 1; i >= 0; i--) {
+    let effect = catchEffects[i];
+    effect.y -= 40 * deltaTime;
+    effect.life -= 1.5 * deltaTime;
+    if (effect.life <= 0) {
+      catchEffects.splice(i, 1);
+    } else {
+      ctx.save();
+      ctx.globalAlpha = effect.life;
+      ctx.fillStyle = '#FFD700';
+      ctx.font = 'bold 24px "Malgun Gothic", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#e94560';
+      ctx.shadowBlur = 8;
+      ctx.fillText(effect.text, effect.x | 0, effect.y | 0);
+      ctx.restore();
+    }
+  }
+
+  if (gameState === 'PLAYING') {
+    player.update();
+    activeGhosts.forEach((g) => g.update());
+    checkCollisions();
+  }
+  requestAnimationFrame(gameLoop);
+}
+
+function startGameOnInput() {
+  if (!gameStarted) {
+    unlockAudio();
+    gameStarted = true;
+    showStatusMessage('', '');
+    playSound(currentBgm);
+    document.getElementById('pause-btn').style.display = 'flex';
+    aiEventTimer = setTimeout(triggerRandomAIEvent, 5000);
+  }
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (gameState === 'PLAYING') togglePause();
+    else if (gameState === 'PAUSED') resumeGame();
+    return;
+  }
+
+  if (gameState === 'QUIZ') {
+    if (['1', '2', '3', '4'].includes(e.key)) {
+      const btns = document.querySelectorAll('#options-container .option-btn');
+      const btnIndex = parseInt(e.key) - 1;
+      if (btns[btnIndex]) btns[btnIndex].click();
+    }
+    return;
+  }
+
+  if (gameState !== 'PLAYING') return;
+  if (
+    [
+      'ArrowUp',
+      'ArrowDown',
+      'ArrowLeft',
+      'ArrowRight',
+      'w',
+      'a',
+      's',
+      'd',
+      'W',
+      'A',
+      'S',
+      'D',
+    ].includes(e.key)
+  )
+    startGameOnInput();
+  if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+    player.nextDirX = 0;
+    player.nextDirY = -1;
+  } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+    player.nextDirX = 0;
+    player.nextDirY = 1;
+  } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+    player.nextDirX = -1;
+    player.nextDirY = 0;
+  } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+    player.nextDirX = 1;
+    player.nextDirY = 0;
+  }
+});
+
+window.handleVirtualPad = function (dir, e) {
+  if (e) e.preventDefault();
+  if (gameState !== 'PLAYING') return;
+  startGameOnInput();
+  if (dir === 'up') {
+    player.nextDirX = 0;
+    player.nextDirY = -1;
+  } else if (dir === 'down') {
+    player.nextDirX = 0;
+    player.nextDirY = 1;
+  } else if (dir === 'left') {
+    player.nextDirX = -1;
+    player.nextDirY = 0;
+  } else if (dir === 'right') {
+    player.nextDirX = 1;
+    player.nextDirY = 0;
+  }
+};
+
+let swipeStartX = null;
+let swipeStartY = null;
+const SWIPE_THRESHOLD = 20;
+window.addEventListener(
+  'touchstart',
+  (e) => {
+    if (
+      e.target.closest('.dpad-btn') ||
+      e.target.closest('button') ||
+      e.target.id === 'pause-btn'
+    )
+      return;
+    swipeStartX = e.touches[0].clientX;
+    swipeStartY = e.touches[0].clientY;
+  },
+  { passive: false },
+);
+window.addEventListener(
+  'touchmove',
+  (e) => {
+    if (gameState === 'PLAYING') e.preventDefault();
+    if (
+      !swipeStartX ||
+      !swipeStartY ||
+      e.target.closest('.dpad-btn') ||
+      e.target.closest('button') ||
+      e.target.id === 'pause-btn'
+    )
+      return;
+    let touchX = e.touches[0].clientX;
+    let touchY = e.touches[0].clientY;
+    let dx = touchX - swipeStartX;
+    let dy = touchY - swipeStartY;
+    if (Math.abs(dx) > SWIPE_THRESHOLD || Math.abs(dy) > SWIPE_THRESHOLD) {
+      startGameOnInput();
+      if (Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 0) {
+          player.nextDirX = 1;
+          player.nextDirY = 0;
+        } else {
+          player.nextDirX = -1;
+          player.nextDirY = 0;
+        }
+      } else {
+        if (dy > 0) {
+          player.nextDirX = 0;
+          player.nextDirY = 1;
+        } else {
+          player.nextDirX = 0;
+          player.nextDirY = -1;
+        }
+      }
+      swipeStartX = touchX;
+      swipeStartY = touchY;
+    }
+  },
+  { passive: false },
+);
+window.addEventListener('touchend', (e) => {
+  swipeStartX = null;
+  swipeStartY = null;
+});
+
+generatePracticeButtons();
+initStage();
+gameState = 'WAITING';
+document.getElementById('main-menu-modal').style.display = 'block';
+requestAnimationFrame(gameLoop);
